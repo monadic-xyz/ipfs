@@ -3,7 +3,7 @@
 set -euo pipefail
 
 function load-cache() {
-  bucket="gs://gossip-build-cache"
+  bucket="gs://multihash-build-cache"
   key="stack-work-$(sha256sum < stack.yaml | cut -d ' ' -f 1)".tar.gz
   gsutil -m cp -r "$bucket/v1/*" "$bucket/$key" . || true
   for f in stack.tar.gz "$key"; do
@@ -14,7 +14,7 @@ function load-cache() {
 }
 
 function save-cache() {
-  bucket="gs://gossip-build-cache"
+  bucket="gs://multihash-build-cache"
   key="stack-work-$(sha256sum < stack.yaml | cut -d ' ' -f 1)".tar.gz
   if ! gsutil ls "$bucket/$key"; then
     tar czf "$key" .stack-work
