@@ -1,0 +1,6 @@
+resolver: lts-12.19
+packages:
+- multihash-cryptonite
+- multihash-serialise
+extra-deps:
+- serialise-0.2.1.0@sha256:8d6051f64c6ebfaf705195dd0b8dfb667617f2e674b290ed2e44985009e4f951
