@@ -1,0 +1,58 @@
+timeout: 3600s # Cache misses are slow to rebuild
+steps:
+  - id: "Load cache"
+    name: gcr.io/cloud-builders/gsutil
+    entrypoint: "bash"
+    args:
+    - "-c"
+    - |
+      source .ci/ci-cache.sh
+      load-cache
+
+  - id: "Build deps"
+    name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
+    env: ["STACK_ROOT=/workspace/.stack"]
+    entrypoint: "bash"
+    dir: "/tmp"
+    args:
+    - "-c"
+    - |
+      stack config set system-ghc --global true
+      stack config set install-ghc --global false
+      stack install stylish-haskell hlint weeder
+
+  - id: "Format (haskell)"
+    waitFor: ["Build deps"]
+    name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
+    args: ["./.ci/check-haskell-format.sh"]
+
+  - id: "Lint (hlint)"
+    waitFor: ["Build deps"]
+    name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
+    args: ["/builder/home/.local/bin/hlint", "."]
+
+  - id: "Test & Build"
+    waitFor: ["Build deps"]
+    name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
+    env:
+    - STACK_ROOT=/workspace/.stack
+    args:
+    - stack
+    - build
+    - "--test"
+    - "--no-terminal"
+    - "--pedantic"
+
+  - id: "Lint (weeder)"
+    name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
+    env: ["STACK_ROOT=/workspace/.stack"] # weeder uses stack under the hood
+    args: ["/builder/home/.local/bin/weeder", "."]
+
+  - id: "Save cache"
+    name: gcr.io/cloud-builders/gsutil
+    entrypoint: "bash"
+    args:
+    - "-c"
+    - |
+      source .ci/ci-cache.sh
+      save-cache
