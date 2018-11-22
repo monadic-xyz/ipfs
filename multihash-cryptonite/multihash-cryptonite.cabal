@@ -73,7 +73,6 @@ test-suite doctests
         base
       , doctest
       , Glob
-      , multihash-cryptonite
 
     ghc-options:
         -threaded
