@@ -1,0 +1,10 @@
+- package:
+  - name: multibase
+  - section:
+    - name: test:doctests
+    - message:
+      - name: Redundant build-depends entry
+      - depends:
+        - QuickCheck
+        - multibase
+

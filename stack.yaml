@@ -1,7 +1,12 @@
 resolver: lts-12.19
 packages:
 - binary-varint
+- multibase
 - multihash-cryptonite
 - multihash-serialise
+flags:
+  sandi:
+    with-conduit: false
 extra-deps:
+- base58-bytestring-0.1.0@sha256:a1da72ee89d5450bac1c792d9fcbe95ed7154ab7246f2172b57bd4fd9b5eab79
 - serialise-0.2.1.0@sha256:8d6051f64c6ebfaf705195dd0b8dfb667617f2e674b290ed2e44985009e4f951

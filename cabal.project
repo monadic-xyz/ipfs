@@ -1,4 +1,8 @@
 packages:
-    binary-varint
-  , multihash-cryptonite
-  , multihash-serialise
+      binary-varint
+    , multibase
+    , multihash-cryptonite
+    , multihash-serialise
+
+constraints:
+      sandi -f-with-conduit
