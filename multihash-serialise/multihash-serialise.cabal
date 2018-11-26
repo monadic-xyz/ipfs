@@ -4,8 +4,8 @@ build-type:    Simple
 name:          multihash-serialise
 version:       0.1.0.0
 synopsis:      CBOR encoding of multihashes
-homepage:      https://github.com/oscoin/multihash
-bug-reports:   https://github.com/oscoin/multihash/issues
+homepage:      https://github.com/oscoin/multiformats
+bug-reports:   https://github.com/oscoin/multiformats/issues
 license:       BSD3
 license-file:  LICENSE
 author:        Kim Altintop
@@ -20,7 +20,7 @@ extra-source-files:
 
 source-repository head
     type: git
-    location: https://github.com/oscoin/multihash
+    location: https://github.com/oscoin/multiformats
 
 library
     hs-source-dirs: src

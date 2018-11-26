@@ -1,3 +1,3 @@
-# Multihash
+# Multiformats
 
-Haskell implementation of the [multihash](https://github.com/multiformats/multiformats) encoding.
+WIP Haskell implementation of the [multiformats](https://github.com/multiformats/multiformats) specifications.
