@@ -1,2 +1,4 @@
-packages: multihash-cryptonite
-        , multihash-serialise
+packages:
+    binary-varint
+  , multihash-cryptonite
+  , multihash-serialise
