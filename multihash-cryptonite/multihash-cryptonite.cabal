@@ -1,4 +1,4 @@
-cabal-version: >=1.10
+cabal-version: 2.2
 build-type:    Simple
 
 name:          multihash-cryptonite
@@ -6,7 +6,7 @@ version:       0.1.0.0
 synopsis:      Protocol Labs' multihash format
 homepage:      https://github.com/oscoin/multiformats
 bug-reports:   https://github.com/oscoin/multiformats/issues
-license:       BSD3
+license:       BSD-3-Clause
 license-file:  LICENSE
 author:        Kim Altintop
 maintainer:    Kim Altintop <kim@monadic.xyz>, Monadic Team <team@monadic.xyz>
@@ -22,7 +22,19 @@ source-repository head
     type: git
     location: https://github.com/oscoin/multiformats
 
+common common
+    default-language: Haskell2010
+    ghc-options:
+        -Wall
+        -Wcompat
+        -Wincomplete-uni-patterns
+        -Wincomplete-record-updates
+        -Wredundant-constraints
+        -fprint-expanded-synonyms
+        -funbox-small-strict-fields
+
 library
+    import: common
     hs-source-dirs: src
     exposed-modules:
         Data.Binary.VarInt
@@ -37,18 +49,8 @@ library
       , cryptonite >= 0.13
       , memory >= 0.11
 
-    ghc-options:
-        -Wall
-        -Wcompat
-        -Wincomplete-uni-patterns
-        -Wincomplete-record-updates
-        -Wredundant-constraints
-        -fprint-expanded-synonyms
-        -funbox-small-strict-fields
-
-    default-language: Haskell2010
-
 test-suite properties
+    import: common
     main-is: Main.hs
     hs-source-dirs: test/properties
     type: exitcode-stdio-1.0
@@ -65,6 +67,7 @@ test-suite properties
         -with-rtsopts=-N
 
 test-suite doctests
+    import: common
     main-is: Main.hs
     hs-source-dirs: test/doctests
     type: exitcode-stdio-1.0
