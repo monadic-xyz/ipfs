@@ -1,5 +1,6 @@
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE ScopedTypeVariables       #-}
+{-# LANGUAGE ExistentialQuantification  #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE ScopedTypeVariables        #-}
 
 -- |
 -- Copyright   : 2018 Monadic GmbH
@@ -23,6 +24,7 @@ where
 
 import           Data.Multihash.Internal
 
+import           Control.DeepSeq (NFData)
 import qualified Crypto.Hash as C
 import           Data.Bifunctor (bimap)
 import qualified Data.Binary.Get as Binary
@@ -32,10 +34,11 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Builder as Builder
 import           Data.ByteString.Lazy (ByteString)
 import           Data.Coerce (coerce)
+import           Data.Hashable (Hashable)
 
 -- | A multihash-encoded lazy 'ByteString'
 newtype Multihash = Multihash ByteString
-    deriving Eq
+    deriving (Eq, Ord, Hashable, NFData)
 
 -- | Encode a 'C.Digest' as a 'Multihash'.
 fromDigest :: forall a. Multihashable a => C.Digest a -> Multihash
