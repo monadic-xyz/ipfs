@@ -3,7 +3,7 @@
 -- License     : BSD3
 -- Maintainer  : kim@monadic.xyz, team@monadic.xyz
 -- Stability   : stable
--- Portability : non-portable (GHC extensions)
+-- Portability : portable
 --
 module Data.Binary.VarInt
     ( getVarInt
