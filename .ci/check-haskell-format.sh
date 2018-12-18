@@ -10,7 +10,7 @@ base=$(mktemp -d "/tmp/gossip-base.XXXXX")
 srcs=$(find . -name "*.hs" \
               -not -name "Setup.hs" \
               -not -name "Paths_*.hs" \
-              -not -path "dist*" \
+              -not -path "*dist*" \
               -not -path "*/gen/*"\
               -not -path "*.stack*")
 
