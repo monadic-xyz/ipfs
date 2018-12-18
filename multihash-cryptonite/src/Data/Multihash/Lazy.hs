@@ -1,7 +1,6 @@
 {-# LANGUAGE ExistentialQuantification  #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables        #-}
-{-# LANGUAGE TypeApplications           #-}
 
 -- |
 -- Copyright   : 2018 Monadic GmbH

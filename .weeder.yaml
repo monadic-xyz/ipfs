@@ -7,4 +7,13 @@
       - depends:
         - QuickCheck
         - multibase
-
+- package:
+  - name: multihash-cryptonite
+  - section:
+    - name: test:doctests
+    - message:
+      - name: Missing other-modules entry
+      - module: Build_doctests
+    - message:
+      - name: Module not compiled
+      - module: Build_doctests
