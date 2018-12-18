@@ -7,7 +7,14 @@ shopt -s globstar
 PATH=$HOME/.local/bin:$PATH
 
 base=$(mktemp -d "/tmp/gossip-base.XXXXX")
-for f in **/**.hs; do
+srcs=$(find . -name "*.hs" \
+              -not -name "Setup.hs" \
+              -not -name "Paths_*.hs" \
+              -not -path "dist*" \
+              -not -path "*/gen/*"\
+              -not -path "*.stack*")
+
+for f in $srcs; do
   path=$base/$(dirname "$f")
   mkdir -p "$path"
   cp "$f" "$path"
