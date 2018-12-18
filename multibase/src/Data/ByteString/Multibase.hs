@@ -10,6 +10,7 @@ module Data.ByteString.Multibase
 
     -- * Multibase encoding and decoding
     , Multibase
+    , fromMultibase
     , encodedBytes
     , encode
     , decode
@@ -163,6 +164,10 @@ newtype Multibase = Multibase ByteString
 newtype CompactMultibase = Compact ShortByteString
     deriving (Eq, Ord, Hashable, NFData)
 
+-- | Extract the encoded bytes, including the code 'Char', from a 'Multibase'.
+fromMultibase :: Multibase -> ByteString
+fromMultibase = coerce
+
 -- | Extract the encoded bytes from a 'Multibase'.
 --
 -- The code 'Char' signifying the base is stripped.
@@ -177,7 +182,7 @@ encode base bs = coerce $ C8.cons (toCode base) $ encoder base bs
 decode :: ByteString -> Either String ByteString
 decode bs = do
     (c, bs') <- note "Empty input"      $ C8.uncons bs
-    base     <- note "Unknown encoding" $ fromCode c
+    base     <- note ("Unknown encoding " <> show c) $ fromCode c
     decoder base bs'
 
 -- | /O(n)/. Convert a 'Multibase' encoding to a compact representation.
