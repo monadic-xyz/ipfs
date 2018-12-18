@@ -1,8 +1,4 @@
-packages:
-      binary-varint
-    , multibase
-    , multihash-cryptonite
-    , multihash-serialise
+packages: */*.cabal
 
 constraints:
       sandi -f-with-conduit
