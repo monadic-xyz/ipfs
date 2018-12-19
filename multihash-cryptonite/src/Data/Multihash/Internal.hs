@@ -14,14 +14,20 @@ module Data.Multihash.Internal
     ( HashAlgorithm (..)
     , Multihashable
 
-    , getMultihash
+    , getMultihashedDigest
+    , getHashAlgorithm
+    , getLength
 
     , toCode
     , fromCode
     , fromCryptonite
+    , digestSize
+
+    , _3
     )
 where
 
+import           Control.Monad (when)
 import qualified Crypto.Hash as C
 import qualified Data.Binary.Get as Binary
 import           Data.Binary.VarInt (getVarInt)
@@ -30,16 +36,23 @@ import           Data.Word (Word16)
 
 type Multihashable a = (C.HashAlgorithm a, FromCryptonite a)
 
-getMultihash :: forall a. Multihashable a => Binary.Get (C.Digest a)
-getMultihash = do
+getMultihashedDigest :: forall a. Multihashable a => Binary.Get (C.Digest a)
+getMultihashedDigest = do
+    algo <- getHashAlgorithm
+    when (fromCryptonite (Proxy @a) /= algo) $ fail "Algorithm mismatch"
+    len <- getLength
+    dig <- Binary.getByteString len
+    maybe (fail "Invalid Digest") pure $ C.digestFromByteString dig
+
+getHashAlgorithm :: Binary.Get HashAlgorithm
+getHashAlgorithm = do
     code <- Binary.getWord8 >>= getVarInt
     case fromCode code of
-        Nothing -> fail "Unknown HashAlgorithm"
-        Just a' | fromCryptonite (Proxy @a) /= a' -> fail "Algorithm Mismatch"
-                | otherwise -> do
-            len <- Binary.getWord8 >>= getVarInt
-            dig <- Binary.getByteString len
-            maybe (fail "Invalid Digest") pure $ C.digestFromByteString dig
+        Nothing -> fail ("Unknown HashAlgorithm " <> show code)
+        Just ha -> pure ha
+
+getLength :: Binary.Get Int
+getLength = Binary.getWord8 >>= getVarInt
 
 -- | 'Crypto.Hash.HashAlgorithm's for which we know a multihash code.
 --
@@ -139,3 +152,31 @@ fromCode 0x16   = pure SHA3_256
 fromCode 0x15   = pure SHA3_384
 fromCode 0x14   = pure SHA3_512
 fromCode _      = Nothing
+
+digestSize :: HashAlgorithm -> Int
+digestSize Blake2s_160 = C.hashDigestSize C.Blake2s_160
+digestSize Blake2s_224 = C.hashDigestSize C.Blake2s_224
+digestSize Blake2s_256 = C.hashDigestSize C.Blake2s_256
+digestSize Blake2b_160 = C.hashDigestSize C.Blake2b_160
+digestSize Blake2b_224 = C.hashDigestSize C.Blake2b_224
+digestSize Blake2b_256 = C.hashDigestSize C.Blake2b_256
+digestSize Blake2b_384 = C.hashDigestSize C.Blake2b_384
+digestSize Blake2b_512 = C.hashDigestSize C.Blake2b_512
+digestSize MD4         = C.hashDigestSize C.MD4
+digestSize MD5         = C.hashDigestSize C.MD5
+digestSize SHA1        = C.hashDigestSize C.SHA1
+digestSize SHA256      = C.hashDigestSize C.SHA256
+digestSize SHA512      = C.hashDigestSize C.SHA512
+digestSize Keccak_224  = C.hashDigestSize C.Keccak_224
+digestSize Keccak_256  = C.hashDigestSize C.Keccak_256
+digestSize Keccak_384  = C.hashDigestSize C.Keccak_384
+digestSize Keccak_512  = C.hashDigestSize C.Keccak_512
+digestSize SHA3_224    = C.hashDigestSize C.SHA3_224
+digestSize SHA3_256    = C.hashDigestSize C.SHA3_256
+digestSize SHA3_384    = C.hashDigestSize C.SHA3_384
+digestSize SHA3_512    = C.hashDigestSize C.SHA3_512
+
+--------------------------------------------------------------------------------
+
+_3 :: (a, b, c) -> c
+_3 (_, _, x) = x

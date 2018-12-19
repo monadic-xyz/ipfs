@@ -32,6 +32,15 @@ common common
         -Wredundant-constraints
         -fprint-expanded-synonyms
         -funbox-small-strict-fields
+    default-extensions:
+        DeriveGeneric
+        LambdaCase
+        MultiWayIf
+        NamedFieldPuns
+        RecordWildCards
+        StrictData
+        TupleSections
+        TypeApplications
 
 library
     import: common

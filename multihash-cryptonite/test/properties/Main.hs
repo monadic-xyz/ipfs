@@ -32,7 +32,17 @@ prop_roundtripStrict = property $ do
     let
         hashed  = Strict.multihash C.Blake2b_256 bs
         bytes   = Strict.encodedBytes hashed
-        decoded = Strict.fromDigest @C.Blake2b_256 <$> Strict.decodeBytes bytes
+        decoded = Strict.fromDigest @C.Blake2b_256 <$> Strict.decodeDigest bytes
+     in
+        assert $ decoded == Right hashed
+
+prop_roundtripBytesStrict :: Property
+prop_roundtripBytesStrict = property $ do
+    bs <- forAll $ Gen.bytes (Range.singleton 128)
+    let
+        hashed  = Strict.multihash C.Blake2b_256 bs
+        bytes   = Strict.encodedBytes hashed
+        decoded = Strict.decode bytes
      in
         assert $ decoded == Right hashed
 
@@ -42,6 +52,42 @@ prop_roundtripLazy = property $ do
     let
         hashed  = Lazy.multihash C.Blake2b_256 bs
         bytes   = Lazy.encodedBytes hashed
-        decoded = Lazy.fromDigest @C.Blake2b_256 <$> Lazy.decodeBytes bytes
+        decoded = Lazy.fromDigest @C.Blake2b_256 <$> Lazy.decodeDigest bytes
      in
         assert $ decoded == Right hashed
+
+prop_roundtripBytesLazy :: Property
+prop_roundtripBytesLazy = property $ do
+    bs <- forAll $ Gen.bytes (Range.singleton 128)
+    let
+        hashed  = Lazy.multihash C.Blake2b_256 bs
+        bytes   = Lazy.encodedBytes hashed
+        decoded = Lazy.decode bytes
+     in
+        assert $ decoded == Right hashed
+
+prop_algorithmMismatchStrict :: Property
+prop_algorithmMismatchStrict = property $ do
+    bs <- forAll $ Gen.bytes (Range.singleton 128)
+    let
+        hashed  = Strict.multihash C.Blake2b_256 bs
+        bytes   = Strict.encodedBytes hashed
+        decoded = Strict.fromDigest @C.SHA256 <$> Strict.decodeDigest bytes
+     in do
+        annotate (render decoded)
+        assert $ decoded == Left "Algorithm mismatch"
+
+prop_algorithmMismatchLazy :: Property
+prop_algorithmMismatchLazy = property $ do
+    bs <- forAll $ Gen.bytes (Range.singleton 128)
+    let
+        hashed  = Lazy.multihash C.Blake2b_256 bs
+        bytes   = Lazy.encodedBytes hashed
+        decoded = Lazy.fromDigest @C.SHA256 <$> Lazy.decodeDigest bytes
+     in do
+        annotate (render decoded)
+        assert $ decoded == Left "Algorithm mismatch"
+
+render :: Either String a -> String
+render (Left  s) = "Left " <> s
+render (Right _) = "Right <multihash>"
