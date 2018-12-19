@@ -1,5 +1,5 @@
 cabal-version: 2.2
-build-type:    Simple
+build-type:    Custom
 
 name:          multihash-cryptonite
 version:       0.1.0.0
@@ -22,6 +22,12 @@ source-repository head
     type: git
     location: https://github.com/oscoin/multiformats
 
+custom-setup
+    setup-depends:
+          base >= 4.9 && < 5
+        , Cabal
+        , cabal-doctest >= 1
+
 common common
     default-language: Haskell2010
     ghc-options:
@@ -32,6 +38,15 @@ common common
         -Wredundant-constraints
         -fprint-expanded-synonyms
         -funbox-small-strict-fields
+    default-extensions:
+        DeriveGeneric
+        LambdaCase
+        MultiWayIf
+        NamedFieldPuns
+        RecordWildCards
+        StrictData
+        TupleSections
+        TypeApplications
 
 library
     import: common
@@ -74,10 +89,12 @@ test-suite doctests
     hs-source-dirs: test/doctests
     type: exitcode-stdio-1.0
 
+    other-modules:   Build_doctests
+    autogen-modules: Build_doctests
+
     build-depends:
         base
       , doctest
-      , Glob
 
     ghc-options:
         -threaded
