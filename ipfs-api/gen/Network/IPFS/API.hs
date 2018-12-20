@@ -15,14 +15,12 @@ import           Servant.API
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Name": "<string>"
 -- >     "Hash": "<string>"
 -- >     "Bytes": "<int64>"
 -- >     "Size": "<string>"
 -- > }
--- >
 type ApiV0Add =
       "api" :> "v0" :> "add"
     :> ReqBody '[MultipartFormData] L.ByteString
@@ -67,7 +65,6 @@ type ApiV0Add =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Peer": "<string>"
 -- >     "Value": "<float64>"
@@ -75,19 +72,13 @@ type ApiV0Add =
 -- >     "Recv": "<uint64>"
 -- >     "Exchanged": "<uint64>"
 -- > }
--- >
 type ApiV0BitswapLedger =
       "api" :> "v0" :> "bitswap" :> "ledger"
     -- The PeerID (B58) of the ledger to inspect.
-    :> QueryParam' '[Required, Strict] "peer" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | Trigger reprovider.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0BitswapReprovide =
       "api" :> "v0" :> "bitswap" :> "reprovide"
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
@@ -96,7 +87,6 @@ type ApiV0BitswapReprovide =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "ProvideBufLen": "<int>"
 -- >     "Wantlist": [
@@ -112,34 +102,26 @@ type ApiV0BitswapReprovide =
 -- >     "DupBlksReceived": "<uint64>"
 -- >     "DupDataReceived": "<uint64>"
 -- > }
--- >
 type ApiV0BitswapStat =
       "api" :> "v0" :> "bitswap" :> "stat"
     :> Post '[JSON] Value
 
 -- | Remove a given block from your wantlist.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0BitswapUnwant =
       "api" :> "v0" :> "bitswap" :> "unwant"
     -- Key(s) to remove from your wantlist.
-    :> QueryParam' '[Required, Strict] "key" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Show blocks currently on the wantlist.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Keys": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0BitswapWantlist =
       "api" :> "v0" :> "bitswap" :> "wantlist"
     -- Specify which peer to show wantlist for. Default: self.
@@ -147,27 +129,20 @@ type ApiV0BitswapWantlist =
     :> Post '[JSON] Value
 
 -- | Get a raw IPFS block.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0BlockGet =
       "api" :> "v0" :> "block" :> "get"
     -- The base58 multihash of an existing block to get.
-    :> QueryParam' '[Required, Strict] "key" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Store input as an IPFS block.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Key": "<string>"
 -- >     "Size": "<int>"
 -- > }
--- >
 type ApiV0BlockPut =
       "api" :> "v0" :> "block" :> "put"
     :> ReqBody '[MultipartFormData] L.ByteString
@@ -183,16 +158,14 @@ type ApiV0BlockPut =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Hash": "<string>"
 -- >     "Error": "<string>"
 -- > }
--- >
 type ApiV0BlockRm =
       "api" :> "v0" :> "block" :> "rm"
     -- Bash58 encoded multihash of block(s) to remove.
-    :> QueryParam' '[Required, Strict] "hash" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Ignore nonexistent blocks.
     :> QueryParam "force" Bool
     -- Write minimal output.
@@ -203,29 +176,25 @@ type ApiV0BlockRm =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Key": "<string>"
 -- >     "Size": "<int>"
 -- > }
--- >
 type ApiV0BlockStat =
       "api" :> "v0" :> "block" :> "stat"
     -- The base58 multihash of an existing block to stat.
-    :> QueryParam' '[Required, Strict] "key" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | Add default peers to the bootstrap list.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Peers": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0BootstrapAddDefault =
       "api" :> "v0" :> "bootstrap" :> "add" :> "default"
     :> Post '[JSON] Value
@@ -234,13 +203,11 @@ type ApiV0BootstrapAddDefault =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Peers": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0BootstrapList =
       "api" :> "v0" :> "bootstrap" :> "list"
     :> Post '[JSON] Value
@@ -249,27 +216,20 @@ type ApiV0BootstrapList =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Peers": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0BootstrapRmAll =
       "api" :> "v0" :> "bootstrap" :> "rm" :> "all"
     :> Post '[JSON] Value
 
 -- | Show IPFS object data.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0Cat =
       "api" :> "v0" :> "cat"
     -- The path to the IPFS object(s) to be outputted.
-    :> QueryParam' '[Required, Strict] "ipfs-path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Byte offset to begin reading from.
     :> QueryParam "offset" Int
     -- Maximum number of bytes to read.
@@ -280,7 +240,6 @@ type ApiV0Cat =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Name": "<string>"
 -- >     "Subcommands": [
@@ -317,7 +276,6 @@ type ApiV0Cat =
 -- >     ]
 -- >     "showOpts": "<bool>"
 -- > }
--- >
 type ApiV0Commands =
       "api" :> "v0" :> "commands"
     -- Show command flags.
@@ -325,69 +283,42 @@ type ApiV0Commands =
     :> Post '[JSON] Value
 
 -- | Open the config file for editing in $EDITOR.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0ConfigEdit =
       "api" :> "v0" :> "config" :> "edit"
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Apply profile to config.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0ConfigProfileApply =
       "api" :> "v0" :> "config" :> "profile" :> "apply"
     -- The profile to apply to the config.
-    :> QueryParam' '[Required, Strict] "profile" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Replace the config with <file>.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0ConfigReplace =
       "api" :> "v0" :> "config" :> "replace"
     :> ReqBody '[MultipartFormData] L.ByteString
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Output config file contents.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0ConfigShow =
       "api" :> "v0" :> "config" :> "show"
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Get a dag node from ipfs.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0DagGet =
       "api" :> "v0" :> "dag" :> "get"
     -- The object to get
-    :> QueryParam' '[Required, Strict] "ref" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Add a dag node to ipfs.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Cid": "<string>"
 -- > }
--- >
 type ApiV0DagPut =
       "api" :> "v0" :> "dag" :> "put"
     :> ReqBody '[MultipartFormData] L.ByteString
@@ -405,23 +336,20 @@ type ApiV0DagPut =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Cid": "<string>"
 -- >     "RemPath": "<string>"
 -- > }
--- >
 type ApiV0DagResolve =
       "api" :> "v0" :> "dag" :> "resolve"
     -- The path to resolve
-    :> QueryParam' '[Required, Strict] "ref" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | Query the DHT for all of the multiaddresses associated with a Peer ID.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "ID": "<string>"
 -- >     "Type": "<int>"
@@ -435,11 +363,10 @@ type ApiV0DagResolve =
 -- >     ]
 -- >     "Extra": "<string>"
 -- > }
--- >
 type ApiV0DhtFindpeer =
       "api" :> "v0" :> "dht" :> "findpeer"
     -- The ID of the peer to search for.
-    :> QueryParam' '[Required, Strict] "peerID" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Print extra information.
     :> QueryParam "verbose" Bool
     :> Post '[JSON] Value
@@ -448,7 +375,6 @@ type ApiV0DhtFindpeer =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "ID": "<string>"
 -- >     "Type": "<int>"
@@ -462,11 +388,10 @@ type ApiV0DhtFindpeer =
 -- >     ]
 -- >     "Extra": "<string>"
 -- > }
--- >
 type ApiV0DhtFindprovs =
       "api" :> "v0" :> "dht" :> "findprovs"
     -- The key to find providers for.
-    :> QueryParam' '[Required, Strict] "key" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Print extra information.
     :> QueryParam "verbose" Bool
     -- The number of providers to find. Default: 20.
@@ -477,7 +402,6 @@ type ApiV0DhtFindprovs =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "ID": "<string>"
 -- >     "Type": "<int>"
@@ -491,11 +415,10 @@ type ApiV0DhtFindprovs =
 -- >     ]
 -- >     "Extra": "<string>"
 -- > }
--- >
 type ApiV0DhtGet =
       "api" :> "v0" :> "dht" :> "get"
     -- The key to find a value for.
-    :> QueryParam' '[Required, Strict] "key" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Print extra information.
     :> QueryParam "verbose" Bool
     :> Post '[JSON] Value
@@ -504,7 +427,6 @@ type ApiV0DhtGet =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "ID": "<string>"
 -- >     "Type": "<int>"
@@ -518,11 +440,10 @@ type ApiV0DhtGet =
 -- >     ]
 -- >     "Extra": "<string>"
 -- > }
--- >
 type ApiV0DhtProvide =
       "api" :> "v0" :> "dht" :> "provide"
     -- The key[s] to send provide records for.
-    :> QueryParam' '[Required, Strict] "key" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Print extra information.
     :> QueryParam "verbose" Bool
     -- Recursively provide entire graph.
@@ -533,7 +454,6 @@ type ApiV0DhtProvide =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "ID": "<string>"
 -- >     "Type": "<int>"
@@ -547,13 +467,12 @@ type ApiV0DhtProvide =
 -- >     ]
 -- >     "Extra": "<string>"
 -- > }
--- >
 type ApiV0DhtPut =
       "api" :> "v0" :> "dht" :> "put"
     -- The key to store the value at.
-    :> QueryParam' '[Required, Strict] "key" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- The value to store.
-    :> QueryParam' '[Required, Strict] "value" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Print extra information.
     :> QueryParam "verbose" Bool
     :> Post '[JSON] Value
@@ -562,7 +481,6 @@ type ApiV0DhtPut =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "ID": "<string>"
 -- >     "Type": "<int>"
@@ -576,43 +494,27 @@ type ApiV0DhtPut =
 -- >     ]
 -- >     "Extra": "<string>"
 -- > }
--- >
 type ApiV0DhtQuery =
       "api" :> "v0" :> "dht" :> "query"
     -- The peerID to run the query against.
-    :> QueryParam' '[Required, Strict] "peerID" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Print extra information.
     :> QueryParam "verbose" Bool
     :> Post '[JSON] Value
 
 -- | Clear inactive requests from the log.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0DiagCmdsClear =
       "api" :> "v0" :> "diag" :> "cmds" :> "clear"
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Set how long to keep inactive requests in the log.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0DiagCmdsSetTime =
       "api" :> "v0" :> "diag" :> "cmds" :> "set-time"
     -- Time to keep inactive requests in log.
-    :> QueryParam' '[Required, Strict] "time" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Print system diagnostic information.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0DiagSys =
       "api" :> "v0" :> "diag" :> "sys"
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
@@ -621,15 +523,13 @@ type ApiV0DiagSys =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Path": "<string>"
 -- > }
--- >
 type ApiV0Dns =
       "api" :> "v0" :> "dns"
     -- The domain-name name to resolve.
-    :> QueryParam' '[Required, Strict] "domain-name" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Resolve until the result is not a DNS link.
     :> QueryParam "recursive" Bool
     :> Post '[JSON] Value
@@ -638,7 +538,6 @@ type ApiV0Dns =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Arguments": {
 -- >         "<string>": "<string>"
@@ -659,23 +558,17 @@ type ApiV0Dns =
 -- >         }
 -- >     }
 -- > }
--- >
 type ApiV0FileLs =
       "api" :> "v0" :> "file" :> "ls"
     -- The path to the IPFS object(s) to list links from.
-    :> QueryParam' '[Required, Strict] "ipfs-path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | Change the cid version or hash function of the root node of a given path.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0FilesChcid =
       "api" :> "v0" :> "files" :> "chcid"
     -- Path to change. Default: '/'.
-    :> QueryParam' '[Required, Strict] "path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Cid version to use. (experimental).
     :> QueryParam "cid-version" Int
     -- Hash function to use. Will set Cid version to 1 if used. (experimental).
@@ -683,36 +576,25 @@ type ApiV0FilesChcid =
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Copy files into mfs.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0FilesCp =
       "api" :> "v0" :> "files" :> "cp"
     -- Source object to copy.
-    :> QueryParam' '[Required, Strict] "source" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Destination to copy object to.
-    :> QueryParam' '[Required, Strict] "dest" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Flush a given path's data to disk.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0FilesFlush =
       "api" :> "v0" :> "files" :> "flush"
     -- Path to flush. Default: '/'.
-    :> QueryParam' '[Required, Strict] "path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | List directories in the local mutable namespace.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Entries": [
 -- >         {
@@ -723,25 +605,19 @@ type ApiV0FilesFlush =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0FilesLs =
       "api" :> "v0" :> "files" :> "ls"
     -- Path to show listing for. Defaults to '/'.
-    :> QueryParam' '[Required, Strict] "path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Use long listing format.
     :> QueryParam "l" Bool
     :> Post '[JSON] Value
 
 -- | Make directories.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0FilesMkdir =
       "api" :> "v0" :> "files" :> "mkdir"
     -- Path to dir to make.
-    :> QueryParam' '[Required, Strict] "path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- No error if existing, make parent directories as needed.
     :> QueryParam "parents" Bool
     -- Cid version to use. (experimental).
@@ -751,29 +627,19 @@ type ApiV0FilesMkdir =
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Move files.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0FilesMv =
       "api" :> "v0" :> "files" :> "mv"
     -- Source file to move.
-    :> QueryParam' '[Required, Strict] "source" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Destination path for file to be moved to.
-    :> QueryParam' '[Required, Strict] "dest" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Read a file in a given mfs.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0FilesRead =
       "api" :> "v0" :> "files" :> "read"
     -- Path to file to be read.
-    :> QueryParam' '[Required, Strict] "path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Byte offset to begin reading from.
     :> QueryParam "offset" Int
     -- Maximum number of bytes to read.
@@ -781,15 +647,10 @@ type ApiV0FilesRead =
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Remove a file.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0FilesRm =
       "api" :> "v0" :> "files" :> "rm"
     -- File to remove.
-    :> QueryParam' '[Required, Strict] "path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Recursively remove directories.
     :> QueryParam "recursive" Bool
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
@@ -798,7 +659,6 @@ type ApiV0FilesRm =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Hash": "<string>"
 -- >     "Size": "<uint64>"
@@ -809,11 +669,10 @@ type ApiV0FilesRm =
 -- >     "Local": "<bool>"
 -- >     "SizeLocal": "<uint64>"
 -- > }
--- >
 type ApiV0FilesStat =
       "api" :> "v0" :> "files" :> "stat"
     -- Path to node to stat.
-    :> QueryParam' '[Required, Strict] "path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Print statistics in given format. Allowed tokens: <hash> <size> <cumulsize>
     -- <type> <childs>. Conflicts with other format options. Default: <hash> Size:
     -- <size> CumulativeSize: <cumulsize> ChildBlocks: <childs> Type: <type>.
@@ -828,15 +687,10 @@ type ApiV0FilesStat =
     :> Post '[JSON] Value
 
 -- | Write to a mutable file in a given filesystem.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0FilesWrite =
       "api" :> "v0" :> "files" :> "write"
     -- Path to write to.
-    :> QueryParam' '[Required, Strict] "path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> ReqBody '[MultipartFormData] L.ByteString
     -- Byte offset to begin writing at.
     :> QueryParam "offset" Int
@@ -858,12 +712,10 @@ type ApiV0FilesWrite =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Ref": "<string>"
 -- >     "Err": "<string>"
 -- > }
--- >
 type ApiV0FilestoreDups =
       "api" :> "v0" :> "filestore" :> "dups"
     :> Post '[JSON] Value
@@ -872,7 +724,6 @@ type ApiV0FilestoreDups =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Status": "<int32>"
 -- >     "ErrorMsg": "<string>"
@@ -881,11 +732,10 @@ type ApiV0FilestoreDups =
 -- >     "Offset": "<uint64>"
 -- >     "Size": "<uint64>"
 -- > }
--- >
 type ApiV0FilestoreLs =
       "api" :> "v0" :> "filestore" :> "ls"
     -- Cid of objects to list.
-    :> QueryParam' '[Required, Strict] "obj" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- sort the results based on the path of the backing file.
     :> QueryParam "file-order" Bool
     :> Post '[JSON] Value
@@ -894,7 +744,6 @@ type ApiV0FilestoreLs =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Status": "<int32>"
 -- >     "ErrorMsg": "<string>"
@@ -903,25 +752,19 @@ type ApiV0FilestoreLs =
 -- >     "Offset": "<uint64>"
 -- >     "Size": "<uint64>"
 -- > }
--- >
 type ApiV0FilestoreVerify =
       "api" :> "v0" :> "filestore" :> "verify"
     -- Cid of objects to verify.
-    :> QueryParam' '[Required, Strict] "obj" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- verify the objects based on the order of the backing file.
     :> QueryParam "file-order" Bool
     :> Post '[JSON] Value
 
 -- | Download IPFS objects.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0Get =
       "api" :> "v0" :> "get"
     -- The path to the IPFS object(s) to be outputted.
-    :> QueryParam' '[Required, Strict] "ipfs-path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- The path where the output should be stored.
     :> QueryParam "output" Text
     -- Output a TAR archive.
@@ -936,7 +779,6 @@ type ApiV0Get =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "ID": "<string>"
 -- >     "PublicKey": "<string>"
@@ -946,11 +788,10 @@ type ApiV0Get =
 -- >     "AgentVersion": "<string>"
 -- >     "ProtocolVersion": "<string>"
 -- > }
--- >
 type ApiV0Id =
       "api" :> "v0" :> "id"
     -- Peer.ID of node to look up.
-    :> QueryParam' '[Required, Strict] "peerid" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Optional output format.
     :> QueryParam "format" Text
     :> Post '[JSON] Value
@@ -959,16 +800,14 @@ type ApiV0Id =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Name": "<string>"
 -- >     "Id": "<string>"
 -- > }
--- >
 type ApiV0KeyGen =
       "api" :> "v0" :> "key" :> "gen"
     -- name of key to create
-    :> QueryParam' '[Required, Strict] "name" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- type of the key to create [rsa, ed25519].
     :> QueryParam "type" Text
     -- size of the key to generate.
@@ -979,7 +818,6 @@ type ApiV0KeyGen =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Keys": [
 -- >         {
@@ -988,7 +826,6 @@ type ApiV0KeyGen =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0KeyList =
       "api" :> "v0" :> "key" :> "list"
     -- Show extra information about keys.
@@ -999,20 +836,18 @@ type ApiV0KeyList =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Was": "<string>"
 -- >     "Now": "<string>"
 -- >     "Id": "<string>"
 -- >     "Overwrite": "<bool>"
 -- > }
--- >
 type ApiV0KeyRename =
       "api" :> "v0" :> "key" :> "rename"
     -- name of key to rename
-    :> QueryParam' '[Required, Strict] "name" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- new name of the key
-    :> QueryParam' '[Required, Strict] "newName" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Allow to overwrite an existing key.
     :> QueryParam "force" Bool
     :> Post '[JSON] Value
@@ -1021,7 +856,6 @@ type ApiV0KeyRename =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Keys": [
 -- >         {
@@ -1030,11 +864,10 @@ type ApiV0KeyRename =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0KeyRm =
       "api" :> "v0" :> "key" :> "rm"
     -- names of keys to remove
-    :> QueryParam' '[Required, Strict] "name" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Show extra information about keys.
     :> QueryParam "l" Bool
     :> Post '[JSON] Value
@@ -1043,41 +876,32 @@ type ApiV0KeyRm =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Message": "<string>"
 -- > }
--- >
 type ApiV0LogLevel =
       "api" :> "v0" :> "log" :> "level"
     -- The subsystem logging identifier. Use 'all' for all subsystems.
-    :> QueryParam' '[Required, Strict] "subsystem" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- The log level, with 'debug' the most verbose and 'critical' the least verbose.
     -- One of: debug, info, warning, error, critical.
-    :> QueryParam' '[Required, Strict] "level" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | List the logging subsystems.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Strings": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0LogLs =
       "api" :> "v0" :> "log" :> "ls"
     :> Post '[JSON] Value
 
 -- | Read the event log.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0LogTail =
       "api" :> "v0" :> "log" :> "tail"
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
@@ -1086,7 +910,6 @@ type ApiV0LogTail =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Objects": [
 -- >         {
@@ -1102,11 +925,10 @@ type ApiV0LogTail =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0Ls =
       "api" :> "v0" :> "ls"
     -- The path to the IPFS object(s) to list links from.
-    :> QueryParam' '[Required, Strict] "ipfs-path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Print table headers (Hash, Size, Name).
     :> QueryParam "headers" Bool
     -- Resolve linked objects to find out their types. Default: true.
@@ -1117,13 +939,11 @@ type ApiV0Ls =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "IPFS": "<string>"
 -- >     "IPNS": "<string>"
 -- >     "FuseAllowOther": "<bool>"
 -- > }
--- >
 type ApiV0Mount =
       "api" :> "v0" :> "mount"
     -- The path where IPFS should be mounted.
@@ -1136,16 +956,14 @@ type ApiV0Mount =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Name": "<string>"
 -- >     "Value": "<string>"
 -- > }
--- >
 type ApiV0NamePublish =
       "api" :> "v0" :> "name" :> "publish"
     -- ipfs path of the object to be published.
-    :> QueryParam' '[Required, Strict] "ipfs-path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Resolve given path before publishing. Default: true.
     :> QueryParam "resolve" Bool
     -- Time duration that the record will be valid for. Default: 24h. This accepts
@@ -1163,26 +981,22 @@ type ApiV0NamePublish =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Canceled": "<bool>"
 -- > }
--- >
 type ApiV0NamePubsubCancel =
       "api" :> "v0" :> "name" :> "pubsub" :> "cancel"
     -- Name to cancel the subscription for.
-    :> QueryParam' '[Required, Strict] "name" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | Query the state of IPNS pubsub
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Enabled": "<bool>"
 -- > }
--- >
 type ApiV0NamePubsubState =
       "api" :> "v0" :> "name" :> "pubsub" :> "state"
     :> Post '[JSON] Value
@@ -1191,13 +1005,11 @@ type ApiV0NamePubsubState =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Strings": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0NamePubsubSubs =
       "api" :> "v0" :> "name" :> "pubsub" :> "subs"
     :> Post '[JSON] Value
@@ -1206,15 +1018,13 @@ type ApiV0NamePubsubSubs =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Path": "<string>"
 -- > }
--- >
 type ApiV0NameResolve =
       "api" :> "v0" :> "name" :> "resolve"
     -- The IPNS name to resolve. Defaults to your node's peerID.
-    :> QueryParam' '[Required, Strict] "name" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Resolve until the result is not an IPNS name.
     :> QueryParam "recursive" Bool
     -- Do not use cached entries.
@@ -1227,22 +1037,16 @@ type ApiV0NameResolve =
     :> Post '[JSON] Value
 
 -- | Output the raw bytes of an IPFS object.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0ObjectData =
       "api" :> "v0" :> "object" :> "data"
     -- Key of the object to retrieve, in base58-encoded multihash format.
-    :> QueryParam' '[Required, Strict] "key" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Display the diff between two ipfs objects.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Changes": [
 -- >         {
@@ -1253,13 +1057,12 @@ type ApiV0ObjectData =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0ObjectDiff =
       "api" :> "v0" :> "object" :> "diff"
     -- Object to diff against.
-    :> QueryParam' '[Required, Strict] "obj_a" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Object to diff.
-    :> QueryParam' '[Required, Strict] "obj_b" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Print extra information.
     :> QueryParam "verbose" Bool
     :> Post '[JSON] Value
@@ -1268,7 +1071,6 @@ type ApiV0ObjectDiff =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Links": [
 -- >         {
@@ -1279,18 +1081,16 @@ type ApiV0ObjectDiff =
 -- >     ]
 -- >     "Data": "<string>"
 -- > }
--- >
 type ApiV0ObjectGet =
       "api" :> "v0" :> "object" :> "get"
     -- Key of the object to retrieve, in base58-encoded multihash format.
-    :> QueryParam' '[Required, Strict] "key" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | Output the links pointed to by the specified object.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Hash": "<string>"
 -- >     "Links": [
@@ -1301,11 +1101,10 @@ type ApiV0ObjectGet =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0ObjectLinks =
       "api" :> "v0" :> "object" :> "links"
     -- Key of the object to retrieve, in base58-encoded multihash format.
-    :> QueryParam' '[Required, Strict] "key" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Print table headers (Hash, Size, Name).
     :> QueryParam "headers" Bool
     :> Post '[JSON] Value
@@ -1314,7 +1113,6 @@ type ApiV0ObjectLinks =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Hash": "<string>"
 -- >     "Links": [
@@ -1325,18 +1123,16 @@ type ApiV0ObjectLinks =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0ObjectNew =
       "api" :> "v0" :> "object" :> "new"
     -- Template to use. Optional.
-    :> QueryParam' '[Required, Strict] "template" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | Add a link to a given object.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Hash": "<string>"
 -- >     "Links": [
@@ -1347,15 +1143,14 @@ type ApiV0ObjectNew =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0ObjectPatchAddLink =
       "api" :> "v0" :> "object" :> "patch" :> "add-link"
     -- The hash of the node to modify.
-    :> QueryParam' '[Required, Strict] "root" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Name of link to create.
-    :> QueryParam' '[Required, Strict] "name" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- IPFS object to add link to.
-    :> QueryParam' '[Required, Strict] "ref" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Create intermediary nodes.
     :> QueryParam "create" Bool
     :> Post '[JSON] Value
@@ -1364,7 +1159,6 @@ type ApiV0ObjectPatchAddLink =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Hash": "<string>"
 -- >     "Links": [
@@ -1375,11 +1169,10 @@ type ApiV0ObjectPatchAddLink =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0ObjectPatchAppendData =
       "api" :> "v0" :> "object" :> "patch" :> "append-data"
     -- The hash of the node to modify.
-    :> QueryParam' '[Required, Strict] "root" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> ReqBody '[MultipartFormData] L.ByteString
     :> Post '[JSON] Value
 
@@ -1387,7 +1180,6 @@ type ApiV0ObjectPatchAppendData =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Hash": "<string>"
 -- >     "Links": [
@@ -1398,20 +1190,18 @@ type ApiV0ObjectPatchAppendData =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0ObjectPatchRmLink =
       "api" :> "v0" :> "object" :> "patch" :> "rm-link"
     -- The hash of the node to modify.
-    :> QueryParam' '[Required, Strict] "root" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Name of the link to remove.
-    :> QueryParam' '[Required, Strict] "link" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | Set the data field of an IPFS object.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Hash": "<string>"
 -- >     "Links": [
@@ -1422,11 +1212,10 @@ type ApiV0ObjectPatchRmLink =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0ObjectPatchSetData =
       "api" :> "v0" :> "object" :> "patch" :> "set-data"
     -- The hash of the node to modify.
-    :> QueryParam' '[Required, Strict] "root" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> ReqBody '[MultipartFormData] L.ByteString
     :> Post '[JSON] Value
 
@@ -1434,7 +1223,6 @@ type ApiV0ObjectPatchSetData =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Hash": "<string>"
 -- >     "Links": [
@@ -1445,7 +1233,6 @@ type ApiV0ObjectPatchSetData =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0ObjectPut =
       "api" :> "v0" :> "object" :> "put"
     :> ReqBody '[MultipartFormData] L.ByteString
@@ -1463,7 +1250,6 @@ type ApiV0ObjectPut =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Hash": "<string>"
 -- >     "NumLinks": "<int>"
@@ -1472,23 +1258,17 @@ type ApiV0ObjectPut =
 -- >     "DataSize": "<int>"
 -- >     "CumulativeSize": "<int>"
 -- > }
--- >
 type ApiV0ObjectStat =
       "api" :> "v0" :> "object" :> "stat"
     -- Key of the object to retrieve, in base58-encoded multihash format.
-    :> QueryParam' '[Required, Strict] "key" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | Close active p2p listener.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0P2pListenerClose =
       "api" :> "v0" :> "p2p" :> "listener" :> "close"
     -- P2P listener protocol
-    :> QueryParam' '[Required, Strict] "Protocol" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Close all listeners.
     :> QueryParam "all" Bool
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
@@ -1497,7 +1277,6 @@ type ApiV0P2pListenerClose =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Listeners": [
 -- >         {
@@ -1506,7 +1285,6 @@ type ApiV0P2pListenerClose =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0P2pListenerLs =
       "api" :> "v0" :> "p2p" :> "listener" :> "ls"
     -- Print table headers (HandlerID, Protocol, Local, Remote).
@@ -1514,54 +1292,38 @@ type ApiV0P2pListenerLs =
     :> Post '[JSON] Value
 
 -- | Forward p2p connections to a network multiaddr.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0P2pListenerOpen =
       "api" :> "v0" :> "p2p" :> "listener" :> "open"
     -- Protocol identifier.
-    :> QueryParam' '[Required, Strict] "Protocol" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Request handling application address.
-    :> QueryParam' '[Required, Strict] "Address" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Close active p2p stream.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0P2pStreamClose =
       "api" :> "v0" :> "p2p" :> "stream" :> "close"
     -- Stream HandlerID
-    :> QueryParam' '[Required, Strict] "HandlerID" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Close all streams.
     :> QueryParam "all" Bool
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Dial to a p2p listener.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0P2pStreamDial =
       "api" :> "v0" :> "p2p" :> "stream" :> "dial"
     -- Remote peer to connect to
-    :> QueryParam' '[Required, Strict] "Peer" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Protocol identifier.
-    :> QueryParam' '[Required, Strict] "Protocol" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Address to listen for connection/s (default: /ip4/127.0.0.1/tcp/0).
-    :> QueryParam' '[Required, Strict] "BindAddress" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | List active p2p streams.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Streams": [
 -- >         {
@@ -1574,7 +1336,6 @@ type ApiV0P2pStreamDial =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0P2pStreamLs =
       "api" :> "v0" :> "p2p" :> "stream" :> "ls"
     -- Print table headers (HagndlerID, Protocol, Local, Remote).
@@ -1585,18 +1346,16 @@ type ApiV0P2pStreamLs =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Pins": [
 -- >         "<string>"
 -- >     ]
 -- >     "Progress": "<int>"
 -- > }
--- >
 type ApiV0PinAdd =
       "api" :> "v0" :> "pin" :> "add"
     -- Path to object(s) to be pinned.
-    :> QueryParam' '[Required, Strict] "ipfs-path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Recursively pin the object linked to by the specified object(s). Default: true.
     :> QueryParam "recursive" Bool
     -- Show progress.
@@ -1607,7 +1366,6 @@ type ApiV0PinAdd =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Keys": {
 -- >         "<string>": {
@@ -1615,11 +1373,10 @@ type ApiV0PinAdd =
 -- >         }
 -- >     }
 -- > }
--- >
 type ApiV0PinLs =
       "api" :> "v0" :> "pin" :> "ls"
     -- Path to object(s) to be listed.
-    :> QueryParam' '[Required, Strict] "ipfs-path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- The type of pinned keys to list. Can be "direct", "indirect", "recursive", or
     -- "all". Default: all.
     :> QueryParam "type" Text
@@ -1631,17 +1388,15 @@ type ApiV0PinLs =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Pins": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0PinRm =
       "api" :> "v0" :> "pin" :> "rm"
     -- Path to object(s) to be unpinned.
-    :> QueryParam' '[Required, Strict] "ipfs-path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Recursively unpin the object linked to by the specified object(s). Default:
     -- true.
     :> QueryParam "recursive" Bool
@@ -1651,19 +1406,17 @@ type ApiV0PinRm =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Pins": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0PinUpdate =
       "api" :> "v0" :> "pin" :> "update"
     -- Path to old object.
-    :> QueryParam' '[Required, Strict] "from-path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Path to new object to be pinned.
-    :> QueryParam' '[Required, Strict] "to-path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Remove the old pin. Default: true.
     :> QueryParam "unpin" Bool
     :> Post '[JSON] Value
@@ -1672,7 +1425,6 @@ type ApiV0PinUpdate =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Cid": "<string>"
 -- >     "PinStatus": {
@@ -1685,7 +1437,6 @@ type ApiV0PinUpdate =
 -- >         ]
 -- >     }
 -- > }
--- >
 type ApiV0PinVerify =
       "api" :> "v0" :> "pin" :> "verify"
     -- Also write the hashes of non-broken pins.
@@ -1698,17 +1449,15 @@ type ApiV0PinVerify =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Success": "<bool>"
 -- >     "Time": "<int64>"
 -- >     "Text": "<string>"
 -- > }
--- >
 type ApiV0Ping =
       "api" :> "v0" :> "ping"
     -- ID of peer to be pinged.
-    :> QueryParam' '[Required, Strict] "peer ID" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Number of ping messages to send. Default: 10.
     :> QueryParam "count" Int
     :> Post '[JSON] Value
@@ -1717,13 +1466,11 @@ type ApiV0Ping =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Strings": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0PubsubLs =
       "api" :> "v0" :> "pubsub" :> "ls"
     :> Post '[JSON] Value
@@ -1732,38 +1479,30 @@ type ApiV0PubsubLs =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Strings": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0PubsubPeers =
       "api" :> "v0" :> "pubsub" :> "peers"
     -- topic to list connected peers of
-    :> QueryParam' '[Required, Strict] "topic" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | Publish a message to a given pubsub topic.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0PubsubPub =
       "api" :> "v0" :> "pubsub" :> "pub"
     -- Topic to publish to.
-    :> QueryParam' '[Required, Strict] "topic" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Payload of message to publish.
-    :> QueryParam' '[Required, Strict] "data" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Subscribe to messages on a given topic.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Message": {
 -- >         "From": [
@@ -1783,11 +1522,10 @@ type ApiV0PubsubPub =
 -- >         ]
 -- >     }
 -- > }
--- >
 type ApiV0PubsubSub =
       "api" :> "v0" :> "pubsub" :> "sub"
     -- String name of topic to subscribe to.
-    :> QueryParam' '[Required, Strict] "topic" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- try to discover other peers subscribed to the same topic.
     :> QueryParam "discover" Bool
     :> Post '[JSON] Value
@@ -1796,12 +1534,10 @@ type ApiV0PubsubSub =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Ref": "<string>"
 -- >     "Err": "<string>"
 -- > }
--- >
 type ApiV0RefsLocal =
       "api" :> "v0" :> "refs" :> "local"
     :> Post '[JSON] Value
@@ -1810,11 +1546,9 @@ type ApiV0RefsLocal =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Message": "<string>"
 -- > }
--- >
 type ApiV0RepoFsck =
       "api" :> "v0" :> "repo" :> "fsck"
     :> Post '[JSON] Value
@@ -1823,12 +1557,10 @@ type ApiV0RepoFsck =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Key": "<string>"
 -- >     "Error": "<string>"
 -- > }
--- >
 type ApiV0RepoGc =
       "api" :> "v0" :> "repo" :> "gc"
     -- Stream errors.
@@ -1841,7 +1573,6 @@ type ApiV0RepoGc =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "NumObjects": "<uint64>"
 -- >     "RepoSize": "<uint64>"
@@ -1849,7 +1580,6 @@ type ApiV0RepoGc =
 -- >     "Version": "<string>"
 -- >     "StorageMax": "<uint64>"
 -- > }
--- >
 type ApiV0RepoStat =
       "api" :> "v0" :> "repo" :> "stat"
     -- Output RepoSize in MiB.
@@ -1860,12 +1590,10 @@ type ApiV0RepoStat =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Msg": "<string>"
 -- >     "Progress": "<int>"
 -- > }
--- >
 type ApiV0RepoVerify =
       "api" :> "v0" :> "repo" :> "verify"
     :> Post '[JSON] Value
@@ -1874,11 +1602,9 @@ type ApiV0RepoVerify =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Version": "<string>"
 -- > }
--- >
 type ApiV0RepoVersion =
       "api" :> "v0" :> "repo" :> "version"
     -- Write minimal output.
@@ -1889,15 +1615,13 @@ type ApiV0RepoVersion =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Path": "<string>"
 -- > }
--- >
 type ApiV0Resolve =
       "api" :> "v0" :> "resolve"
     -- The name to resolve.
-    :> QueryParam' '[Required, Strict] "name" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     -- Resolve until the result is an IPFS name.
     :> QueryParam "recursive" Bool
     -- Number of records to request for DHT resolution.
@@ -1908,11 +1632,6 @@ type ApiV0Resolve =
     :> Post '[JSON] Value
 
 -- | Shut down the ipfs daemon
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0Shutdown =
       "api" :> "v0" :> "shutdown"
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
@@ -1921,7 +1640,6 @@ type ApiV0Shutdown =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "ProvideBufLen": "<int>"
 -- >     "Wantlist": [
@@ -1937,7 +1655,6 @@ type ApiV0Shutdown =
 -- >     "DupBlksReceived": "<uint64>"
 -- >     "DupDataReceived": "<uint64>"
 -- > }
--- >
 type ApiV0StatsBitswap =
       "api" :> "v0" :> "stats" :> "bitswap"
     :> Post '[JSON] Value
@@ -1946,14 +1663,12 @@ type ApiV0StatsBitswap =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "TotalIn": "<int64>"
 -- >     "TotalOut": "<int64>"
 -- >     "RateIn": "<float64>"
 -- >     "RateOut": "<float64>"
 -- > }
--- >
 type ApiV0StatsBw =
       "api" :> "v0" :> "stats" :> "bw"
     -- Specify a peer to print bandwidth for.
@@ -1972,7 +1687,6 @@ type ApiV0StatsBw =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "NumObjects": "<uint64>"
 -- >     "RepoSize": "<uint64>"
@@ -1980,7 +1694,6 @@ type ApiV0StatsBw =
 -- >     "Version": "<string>"
 -- >     "StorageMax": "<uint64>"
 -- > }
--- >
 type ApiV0StatsRepo =
       "api" :> "v0" :> "stats" :> "repo"
     -- Output RepoSize in MiB.
@@ -1991,13 +1704,11 @@ type ApiV0StatsRepo =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Strings": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0SwarmAddrsListen =
       "api" :> "v0" :> "swarm" :> "addrs" :> "listen"
     :> Post '[JSON] Value
@@ -2006,13 +1717,11 @@ type ApiV0SwarmAddrsListen =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Strings": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0SwarmAddrsLocal =
       "api" :> "v0" :> "swarm" :> "addrs" :> "local"
     -- Show peer ID in addresses.
@@ -2023,75 +1732,66 @@ type ApiV0SwarmAddrsLocal =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Strings": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0SwarmConnect =
       "api" :> "v0" :> "swarm" :> "connect"
     -- Address of peer to connect to.
-    :> QueryParam' '[Required, Strict] "address" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | Close connection to a given address.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Strings": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0SwarmDisconnect =
       "api" :> "v0" :> "swarm" :> "disconnect"
     -- Address of peer to disconnect from.
-    :> QueryParam' '[Required, Strict] "address" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | Add an address filter.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Strings": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0SwarmFiltersAdd =
       "api" :> "v0" :> "swarm" :> "filters" :> "add"
     -- Multiaddr to filter.
-    :> QueryParam' '[Required, Strict] "address" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | Remove an address filter.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Strings": [
 -- >         "<string>"
 -- >     ]
 -- > }
--- >
 type ApiV0SwarmFiltersRm =
       "api" :> "v0" :> "swarm" :> "filters" :> "rm"
     -- Multiaddr filter to remove.
-    :> QueryParam' '[Required, Strict] "address" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Post '[JSON] Value
 
 -- | List peers with open connections.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Peers": [
 -- >         {
@@ -2107,7 +1807,6 @@ type ApiV0SwarmFiltersRm =
 -- >         }
 -- >     ]
 -- > }
--- >
 type ApiV0SwarmPeers =
       "api" :> "v0" :> "swarm" :> "peers"
     -- display all extra information.
@@ -2122,48 +1821,35 @@ type ApiV0SwarmPeers =
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Name": "<string>"
 -- >     "Hash": "<string>"
 -- >     "Bytes": "<int64>"
 -- >     "Size": "<string>"
 -- > }
--- >
 type ApiV0TarAdd =
       "api" :> "v0" :> "tar" :> "add"
     :> ReqBody '[MultipartFormData] L.ByteString
     :> Post '[JSON] Value
 
 -- | Export a tar file from IPFS.
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0TarCat =
       "api" :> "v0" :> "tar" :> "cat"
     -- ipfs path of archive to export.
-    :> QueryParam' '[Required, Strict] "path" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- |
---
--- Response example:
---
--- >
--- > This endpoint returns a `text/plain` response body.
 type ApiV0Update =
       "api" :> "v0" :> "update"
     -- Arguments for subcommand.
-    :> QueryParam' '[Required, Strict] "args" Text
+    :> QueryParam' '[Required, Strict] "arg" Text
     :> Stream 'POST 200 NoFraming PlainText (SourceIO ByteString)
 
 -- | Show ipfs version information.
 --
 -- Response example:
 --
--- >
 -- > {
 -- >     "Version": "<string>"
 -- >     "Commit": "<string>"
@@ -2171,7 +1857,6 @@ type ApiV0Update =
 -- >     "System": "<string>"
 -- >     "Golang": "<string>"
 -- > }
--- >
 type ApiV0Version =
       "api" :> "v0" :> "version"
     -- Only show the version number.
