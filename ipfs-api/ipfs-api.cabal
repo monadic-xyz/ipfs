@@ -1,0 +1,58 @@
+cabal-version: 2.2
+build-type:    Simple
+
+name:          ipfs-api
+version:       0.1.0.0
+synopsis:      Auto-generated IPFS HTTP API
+homepage:      https://github.com/oscoin/ipfs
+bug-reports:   https://github.com/oscoin/ipfs/issues
+license:       BSD-3-Clause
+license-file:  LICENSE
+author:        Kim Altintop
+maintainer:    Kim Altintop <kim@monadic.xyz>, Monadic Team <team@monadic.xyz>
+copyright:     2018 Monadic GmbH
+
+category:      Network, Web
+
+extra-source-files:
+      CHANGELOG.md
+    , README.md
+
+source-repository head
+    type: git
+    location: https://github.com/oscoin/ipfs
+
+common common
+    default-language: Haskell2010
+    ghc-options:
+        -Wall
+        -Wcompat
+        -Wincomplete-uni-patterns
+        -Wincomplete-record-updates
+        -Wredundant-constraints
+        -fprint-expanded-synonyms
+        -funbox-small-strict-fields
+    default-extensions:
+        DeriveGeneric
+        LambdaCase
+        MultiWayIf
+        NamedFieldPuns
+        RecordWildCards
+        StrictData
+        TupleSections
+
+library
+    import: common
+    hs-source-dirs: gen, src
+    exposed-modules:
+        Network.IPFS.API
+        Network.IPFS.API.Types
+
+    build-depends:
+        aeson
+      , base >= 4.9 && < 5
+      , bytestring
+      , http-media
+      , http-types
+      , servant
+      , text
