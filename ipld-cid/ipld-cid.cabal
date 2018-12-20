@@ -1,0 +1,81 @@
+cabal-version: 2.2
+build-type:    Simple
+
+name:          ipld-cid
+version:       0.1.0.0
+synopsis:      IPLD Content-IDentifiers <https://github.com/ipld/cid>
+homepage:      https://github.com/oscoin/ipfs
+bug-reports:   https://github.com/oscoin/ipfs/issues
+license:       BSD-3-Clause
+license-file:  LICENSE
+author:        Kim Altintop
+maintainer:    Kim Altintop <kim@monadic.xyz>, Monadic Team <team@monadic.xyz>
+copyright:     2018 Monadic GmbH
+
+category:      Data
+
+extra-source-files:
+      CHANGELOG.md
+    , README.md
+
+source-repository head
+    type: git
+    location: https://github.com/oscoin/ipfs
+
+common common
+    default-language: Haskell2010
+    ghc-options:
+        -Wall
+        -Wcompat
+        -Wincomplete-uni-patterns
+        -Wincomplete-record-updates
+        -Wredundant-constraints
+        -fprint-expanded-synonyms
+        -funbox-small-strict-fields
+    default-extensions:
+        DeriveGeneric
+        LambdaCase
+        MultiWayIf
+        NamedFieldPuns
+        RecordWildCards
+        StrictData
+        TupleSections
+
+library
+    import: common
+    hs-source-dirs: src
+    exposed-modules:
+        Data.IPLD.CID
+
+    build-depends:
+        base >= 4.9 && < 5
+      , binary
+      , binary-varint
+      , bytestring
+      , cryptonite
+      , deepseq
+      , hashable
+      , multibase
+      , multihash-cryptonite
+      , text
+
+test-suite properties
+    import: common
+    main-is: Main.hs
+    hs-source-dirs: test/properties
+    type: exitcode-stdio-1.0
+
+    build-depends:
+        base
+      , bytestring
+      , cryptonite
+      , hedgehog
+      , ipld-cid
+      , multibase
+      , multihash-cryptonite
+      , text
+
+    ghc-options:
+        -threaded
+        -rtsopts
+        -with-rtsopts=-N
