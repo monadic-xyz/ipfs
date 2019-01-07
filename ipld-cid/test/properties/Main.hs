@@ -48,7 +48,7 @@ props = checkParallel $$(discover)
 prop_roundtripBytes :: Property
 prop_roundtripBytes = property $ do
     cid <- forAll genCID
-    tripping cid (Builder.toLazyByteString . buildCid) (CID.decode . LBS.toStrict)
+    tripping cid (Builder.toLazyByteString . buildCid) (CID.decodeCid . LBS.toStrict)
 
 prop_roundtripText :: Property
 prop_roundtripText = property $ do
