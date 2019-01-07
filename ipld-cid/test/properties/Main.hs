@@ -84,7 +84,7 @@ genCID = Gen.choice [v0, v1]
   where
     v0 = newCidV0 <$> genDigest
     v1 = do
-        codec <- Gen.element [CID.Raw, CID.DagProtobuf, CID.GitRaw]
+        codec <- genCodec
         algo  <- genHashAlgorithm
         case algo of
             Blake2s_160 -> newCidV1 codec <$> genDigest @C.Blake2s_160
@@ -120,3 +120,6 @@ genHashAlgorithm = Gen.prune Gen.enumBounded
 
 genBytes :: GenT Identity ByteString
 genBytes = Gen.prune $ Gen.bytes (Range.singleton 255)
+
+genCodec :: GenT Identity CID.Codec
+genCodec = Gen.element [CID.Raw, CID.DagProtobuf, CID.DagCbor, CID.GitRaw]

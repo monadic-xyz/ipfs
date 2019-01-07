@@ -72,6 +72,7 @@ instance NFData   Version
 data Codec
     = Raw
     | DagProtobuf
+    | DagCbor
     | GitRaw
     deriving (Eq, Show, Ord, Generic)
 
@@ -212,6 +213,7 @@ cidToText cid =
 codecToCode :: Codec -> Word8
 codecToCode Raw         = 0x55
 codecToCode DagProtobuf = 0x70
+codecToCode DagCbor     = 0x71
 codecToCode GitRaw      = 0x78
 
 -- | Attempt to convert from a <https://github.com/multiformats/multicodec multicodec>
@@ -219,5 +221,6 @@ codecToCode GitRaw      = 0x78
 codecFromCode :: Word8 -> Maybe Codec
 codecFromCode 0x55 = pure Raw
 codecFromCode 0x70 = pure DagProtobuf
+codecFromCode 0x71 = pure DagCbor
 codecFromCode 0x78 = pure GitRaw
 codecFromCode _    = Nothing
