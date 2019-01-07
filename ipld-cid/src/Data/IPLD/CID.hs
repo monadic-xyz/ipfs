@@ -23,7 +23,7 @@ module Data.IPLD.CID
     , newCidV0
     , newCidV1
     , buildCid
-    , decode
+    , decodeCid
     , getCid
 
     , cidFromText
@@ -128,10 +128,10 @@ buildCid CID{..} = case cidVersion of
 -- | Decode a 'CID' from a strict 'ByteString'.
 --
 -- @
---    decode . buildCid ≡ id
+--    decodeCid . buildCid ≡ Right
 -- @
-decode :: ByteString -> Either String CID
-decode bs
+decodeCid :: ByteString -> Either String CID
+decodeCid bs
   | isV0      = newCidV0 <$> Multihash.decodeDigest bs
   | otherwise = bimap _3 _3 . Binary.runGetOrFail getCid $ LBS.fromStrict bs
   where
@@ -174,7 +174,7 @@ getCid = do
 --    cidFromText . cidToText ≡ id
 -- @
 cidFromText :: Text -> Either String CID
-cidFromText t = decodeBase >=> decode $ encodeUtf8 t
+cidFromText t = decodeBase >=> decodeCid $ encodeUtf8 t
   where
     isV0 = Text.length t == 46 && "Qm" `Text.isPrefixOf` t
 
