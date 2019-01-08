@@ -4,8 +4,8 @@ build-type:    Simple
 name:          multihash-serialise
 version:       0.1.0.0
 synopsis:      CBOR encoding of multihashes
-homepage:      https://github.com/oscoin/multiformats
-bug-reports:   https://github.com/oscoin/multiformats/issues
+homepage:      https://github.com/oscoin/ipfs
+bug-reports:   https://github.com/oscoin/ipfs/issues
 license:       BSD-3-Clause
 license-file:  LICENSE
 author:        Kim Altintop
@@ -20,7 +20,7 @@ extra-source-files:
 
 source-repository head
     type: git
-    location: https://github.com/oscoin/multiformats
+    location: https://github.com/oscoin/ipfs
 
 common common
     default-language: Haskell2010
