@@ -1,6 +1,7 @@
-resolver: lts-12.19
+resolver: lts-12.21
 packages:
 - binary-varint
+- git-remote-ipfs
 - ipfs-api
 - ipld-cid
 - multibase
@@ -10,6 +11,9 @@ flags:
   sandi:
     with-conduit: false
 extra-deps:
+- git: https://github.com/oscoin/hs-git
+  commit: 6e2a3ec5e7a93bc360fddd22f8ccad2e1512c632
+
 - QuickCheck-2.12.6.1@sha256:95b4e3b01033bf7d2ad21d0085266dba378477ac88e3d11ff238fc9db2575e6d
 - aeson-1.4.2.0@sha256:98602419113e04a5adb3077571b212ad4a8a19c1dfa9e69af808cea90511b94f
 - base-orphans-0.8@sha256:4885caa82ab94fa5cb841d6d06a43a97cdc7e835f346be4f11c1cc5707b886db

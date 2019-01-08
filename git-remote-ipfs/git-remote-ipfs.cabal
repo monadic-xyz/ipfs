@@ -1,0 +1,102 @@
+cabal-version: 2.2
+build-type:    Simple
+
+name:          git-remote-ipfs
+version:       0.1.0.0
+synopsis:      Git remote helper to store git objects on IPFS
+homepage:      https://github.com/oscoin/ipfs
+bug-reports:   https://github.com/oscoin/ipfs/issues
+license:       BSD-3-Clause
+license-file:  LICENSE
+author:        Kim Altintop
+maintainer:    Kim Altintop <kim@monadic.xyz>, Monadic Team <team@monadic.xyz>
+copyright:     2018 Monadic GmbH
+
+category:      Network
+
+extra-source-files:
+      CHANGELOG.md
+    , README.md
+
+source-repository head
+    type: git
+    location: https://github.com/oscoin/ipfs
+
+common common
+    default-language: Haskell2010
+    ghc-options:
+        -Wall
+        -Wcompat
+        -Wincomplete-uni-patterns
+        -Wincomplete-record-updates
+        -Wredundant-constraints
+        -fprint-expanded-synonyms
+        -funbox-small-strict-fields
+
+    default-extensions:
+        BangPatterns
+        DeriveGeneric
+        LambdaCase
+        MultiWayIf
+        NamedFieldPuns
+        RecordWildCards
+        StrictData
+        TupleSections
+        TypeApplications
+
+library
+    import: common
+    hs-source-dirs: src
+
+    exposed-modules:
+        Network.IPFS.Git.RemoteHelper
+        Network.IPFS.Git.RemoteHelper.Client
+        Network.IPFS.Git.RemoteHelper.Command
+        Network.IPFS.Git.RemoteHelper.Format
+        Network.IPFS.Git.RemoteHelper.Internal
+        Network.IPFS.Git.RemoteHelper.Options
+        Network.IPFS.Git.RemoteHelper.Trans
+
+    build-depends:
+        aeson
+      , attoparsec
+      , base >= 4.9 && < 5
+      , bytestring
+      , cryptonite
+      , filepath
+      , formatting
+      , git
+      , http-client
+      , ipfs-api
+      , ipld-cid
+      , lens
+      , lens-aeson
+      , mtl
+      , multibase
+      , multihash-cryptonite
+      , optparse-applicative
+      , safe-exceptions
+      , servant
+      , servant-client >= 0.15
+      , text
+      , transformers
+      , unordered-containers
+      , vector
+
+executable git-remote-ipfs
+    import: common
+    main-is: Main.hs
+    hs-source-dirs: exe/git-remote-ipfs
+
+    build-depends:
+        attoparsec
+      , base
+      , bytestring
+      , conduit
+      , conduit-extra
+      , git-remote-ipfs
+      , ipld-cid
+      , mtl
+      , optparse-applicative
+      , text
+      , typed-process
