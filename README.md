@@ -1,3 +1,1 @@
-# Multiformats
-
-WIP Haskell implementation of the [multiformats](https://github.com/multiformats/multiformats) specifications.
+A collection of Haskell libraries for interacting with [IPFS](https://ipfs.io)
