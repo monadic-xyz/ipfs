@@ -1,1 +1,1 @@
-A collection of Haskell libraries for interaction with [IPFS](https://ipfs.io)
+A collection of Haskell libraries for interacting with [IPFS](https://ipfs.io)

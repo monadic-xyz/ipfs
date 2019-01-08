@@ -34,7 +34,7 @@ latter.
   git push ipfs master
   ```
 
-After you've pushed, the remote's URL will have been updated to point to an
+Pushing will update the remote to point to an
 `ipfs://` URL which links to the latest head(s). Use this URL to clone or pull
 from another machine (`git remote -v` will show the current remote URL).
 
@@ -43,16 +43,16 @@ from another machine (`git remote -v` will show the current remote URL).
 IPFS blocks can be created with the `git-raw` CID format, which allows IPFS to
 interpret the data as loose git objects. When created with `sha1` as the
 (multihash) hash function, the block's CID corresponds to the SHA1 hash of the
-git object, ie. one can be recovered from the other. Crucially, this allows the
+git object, i.e. one can be recovered from the other. Crucially, this allows the
 SHA1 references embedded in a loose git object (eg. parents and tree of a
 commit) to be traversed given a head reference.
 
 In order to obtain the head reference, IPLD links are created corresponding to
 the `refs/heads` directory hierarchy. Note that adding links to an IPFS object
-changes its hash - so essentially, after each push, we get a new object (CID),
-which we need to remember in order to be able to clone or pull.
+changes its hash - this means each push results in a new object (CID),
+which must be retained in order to clone or pull.
 
-Which git objects need to be pushed or fetched is figured out via the [git
+Which git objects need to be pushed or fetched is determined via the [git
 remote helpers](https://git-scm.com/docs/git-remote-helpers) protocol,
 respectively by inspecting the local git repo and remote refs.
 
@@ -71,9 +71,9 @@ respectively by inspecting the local git repo and remote refs.
   may not currently work as expected_).
 
 * The approach to keep all git objects content-addressable in IPFS is nice
-  conceptually, but terribly inefficient: regular git would resort to [packfiles](https://git-scm.com/book/en/v2/Git-Internals-Packfiles),
+  conceptually, but terribly inefficient: regular git resorts to [packfiles](https://git-scm.com/book/en/v2/Git-Internals-Packfiles),
   which use delta encoding and compression in order to obtain a more
   space-efficient on-disk and wire format. There is, however, no global optimum
-  of how to pack any given git repo, and in fact git would re-pack occasionally
+  of how to pack any given git repo, and in fact git re-packs occasionally,
   as it sees fit. It is thus unclear how to optimise git storage in a fully
   distributed setting lacking online coordination.
