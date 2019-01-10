@@ -44,7 +44,6 @@ import           Network.IPFS.Git.RemoteHelper.Client
 import           Network.IPFS.Git.RemoteHelper.Command
 import           Network.IPFS.Git.RemoteHelper.Format
 import           Network.IPFS.Git.RemoteHelper.Internal
-import           Network.IPFS.Git.RemoteHelper.Options
 import           Network.IPFS.Git.RemoteHelper.Trans
 
 data ProcessError
@@ -87,8 +86,8 @@ processCommand (Option name value) = fmap OptionResult $
         _ -> pure OptionUnsupported
 
 processCommand List = fmap ListResult $ do
-    root  <- cidToText <$> asks (optCid . envOptions)
-    paths <- ipfs $ listPaths root 0
+    root  <- asks envIpfsRoot
+    paths <- ipfs $ listPaths (cidToText root) 0
 
     let refpath = joinPath . drop 1 . dropWhile (== "/") . splitDirectories . refPathPath
     let name    = Text.pack . refpath
@@ -105,7 +104,7 @@ processCommand List = fmap ListResult $ do
                 pure $ ListRef (("@" <>) <$> dest) (name path) []
 
 processCommand ListForPush = fmap ListForPushResult $ do
-    root     <- cidToText <$> asks (optCid . envOptions)
+    root     <- asks envIpfsRoot
     branches <- do
         branches <- git Git.branchList
         pure . map (fmt $ "refs/heads/" % frefName) $ toList branches
@@ -114,7 +113,7 @@ processCommand ListForPush = fmap ListForPushResult $ do
     remoteRefs <- do
         cids <-
             fmap catMaybes . for branches $ \branch ->
-                ipfs $ resolvePath (root <> "/" <> branch)
+                ipfs $ resolvePath (cidToText root <> "/" <> branch)
 
         traverse (liftEitherRH . first CidError . hexShaFromCidText) cids
 
@@ -146,28 +145,30 @@ processPush
     -> Text
     -> RemoteHelperT ProcessError m CID
 processPush _ localRef remoteRef = do
-    cid <- asks (optCid . envOptions)
+    root <- asks envIpfsRoot
 
     localHeadRef <- do
         ref <- git $ Git.resolve (Git.Revision (Text.unpack localRef) [])
         maybe (throwRH $ UnknownLocalRef localRef) (pure . refToCid) ref
 
     remoteHeadRef <- do
-        refCid <- ipfs $ resolvePath (cidToText cid <> "/" <> remoteRef)
+        refCid <- ipfs $ resolvePath (cidToText root <> "/" <> remoteRef)
         pure $ refCid >>= hush . cidFromText
 
-    void $ go cid localHeadRef remoteHeadRef
+    void $ go root localHeadRef remoteHeadRef
 
     -- patch link remoteRef
-    cid' <- ipfs $ patchLink cid remoteRef localHeadRef
+    root' <- ipfs $ patchLink root remoteRef localHeadRef
 
     -- The remote HEAD denotes the default branch to check out. If it is not
     -- present, git clone will refuse to check out the worktree and exit with a
     -- scary error message.
     hEAD <- ipfs $ getRef "HEAD"
-    case hEAD of
-        Just  _ -> pure cid'
-        Nothing -> linkedObject cid' "HEAD" "refs/heads/master"
+    root'' <-
+        case hEAD of
+            Just  _ -> pure root'
+            Nothing -> linkedObject root' "HEAD" "refs/heads/master"
+    root'' <$ ipfs (updateRemoteUrl root'')
   where
     go !base localHeadRef remoteHeadRef
         | Just localHeadRef == remoteHeadRef = pure base
@@ -225,7 +226,7 @@ processFetch
     -> RemoteHelperT ProcessError m ()
 processFetch sha = do
     repo  <- Git.gitRepoPath <$> Git.getGit
-    root  <- asks (optCid . envOptions)
+    root  <- asks envIpfsRoot
     cid   <- liftEitherRH . first CidError $ cidFromHexShaText sha
     lobjs <- ipfs $ largeObjects root -- XXX: load lobjs only once
     go repo root lobjs cid
