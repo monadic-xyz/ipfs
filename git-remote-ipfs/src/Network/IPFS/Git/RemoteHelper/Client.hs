@@ -46,6 +46,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as LT (decodeUtf8)
 import           Data.Traversable (for)
+import           Formatting (sformat, stext, (%))
 import           System.FilePath (joinPath)
 import           System.Process.Typed (runProcess_, shell)
 
@@ -270,19 +271,25 @@ updateRemoteUrl root = do
   where
     viaIpns name = do
         logInfo "Updating IPNS"
+        let ipnsTarget = "/ipfs/" <> cidToText root
         res <-
-            ipfsNamePublish ("/ipfs/" <> cidToText root)
+            ipfsNamePublish ipnsTarget
                             (Just True)       -- resolve
                             (Just "2540400h") -- lifetime
                             Nothing           -- ttl (caching)
                             (Just name)       -- key
 
-        case liftA2 (\name' root' -> name' == name && root' == cidToText root)
+        case liftA2 (\name' root' -> name' == name && root' == ipnsTarget)
                     (Lens.firstOf nameL  res)
                     (Lens.firstOf valueL res) of
             Just True -> pure ()
             _         -> throwRH $
-                InvalidResponse "ipfsNamePublish: mismatch" res
+                InvalidResponse
+                    (sformat ( "ipfsNamePublish: expected name "
+                             % "`" % stext % "` "
+                             % "pointing to `" % stext % "`"
+                             ) name ipnsTarget)
+                    res
 
     viaConfig scheme cid = do
         remoteName <- asks $ Text.pack . optRemoteName . envOptions

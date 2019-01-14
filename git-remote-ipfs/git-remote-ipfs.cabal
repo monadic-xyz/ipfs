@@ -22,6 +22,11 @@ source-repository head
     type: git
     location: https://github.com/oscoin/ipfs
 
+flag with-e2e-tests
+    description: Build end-to-end test suite
+    default:     False
+    manual:      True
+
 common common
     default-language: Haskell2010
     ghc-options:
@@ -100,3 +105,37 @@ executable git-remote-ipfs
       , mtl
       , optparse-applicative
       , text
+
+test-suite e2e-tests
+    import: common
+
+    if flag(with-e2e-tests)
+        buildable: True
+    else
+        buildable: False
+
+    main-is: Main.hs
+    hs-source-dirs: test/e2e
+    type: exitcode-stdio-1.0
+
+    build-depends:
+        base
+      , bytestring
+      , filepath
+      , gitlib
+      , gitlib-libgit2
+      , http-client
+      , ipfs-api
+      , lens
+      , lens-aeson
+      , mtl
+      , safe-exceptions
+      , servant
+      , servant-client >= 0.15
+      , tagged
+      , tasty
+      , tasty-hunit
+      , temporary
+      , text
+      , time
+      , typed-process
