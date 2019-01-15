@@ -23,9 +23,11 @@ module Network.IPFS.Git.RemoteHelper.Client
     , largeObjects
     , provideBlock
     , getBlock
+    , updateRemoteUrl
     )
 where
 
+import           Control.Applicative (liftA2)
 import           Control.Exception.Safe
 import qualified Control.Lens as Lens
 import           Control.Monad.Except
@@ -45,6 +47,7 @@ import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as LT (decodeUtf8)
 import           Data.Traversable (for)
 import           System.FilePath (joinPath)
+import           System.Process.Typed (runProcess_, shell)
 
 import           Servant.API
 import           Servant.Client (ServantError(..))
@@ -53,12 +56,17 @@ import qualified Servant.Client.Streaming as ServantS
 import           Servant.Types.SourceT
 
 import           Data.IPLD.CID (CID, cidFromText, cidToText)
-import qualified Data.IPLD.CID as CID
 import           Network.IPFS.API
 
 import           Network.IPFS.Git.RemoteHelper.Format
 import           Network.IPFS.Git.RemoteHelper.Internal
 import           Network.IPFS.Git.RemoteHelper.Options
+                 ( IpfsPath(..)
+                 , optRemoteName
+                 , optRemoteUrl
+                 , remoteUrlIpfsPath
+                 , remoteUrlScheme
+                 )
 import           Network.IPFS.Git.RemoteHelper.Trans
 
 data ClientError
@@ -128,7 +136,7 @@ getRef
     => FilePath
     -> RemoteHelperT ClientError m (Maybe Text)
 getRef name = do
-    root <- Text.unpack . CID.cidToText <$> asks (optCid . envOptions)
+    root <- asks $ Text.unpack . cidToText . envIpfsRoot
 
     let path = Text.pack $ joinPath [root, name]
     logDebug $ "getRef: " <> path
@@ -163,9 +171,8 @@ patchLink from name to = do
 
 largeObjects :: MonadIO m => CID -> RemoteHelperT ClientError m (HashMap CID CID)
 largeObjects root = do
-    res  <-
-        ipfsList (CID.cidToText root <> "/objects") Nothing Nothing
-            `catchRH` noLink
+    res <-
+        ipfsList (cidToText root <> "/objects") Nothing Nothing `catchRH` noLink
     either throwRH (pure . Map.fromList)
         . for (Lens.toListOf linksL res) $ \link -> do
             hash <- toCid =<<
@@ -254,6 +261,39 @@ getBlock
     -> RemoteHelperT ClientError m L.ByteString
 getBlock cid = stream $ ipfsBlockGet (cidToText cid)
 
+updateRemoteUrl :: MonadIO m => CID -> RemoteHelperT ClientError m ()
+updateRemoteUrl root = do
+    url <- asks $ optRemoteUrl . envOptions
+    case remoteUrlIpfsPath url of
+        IpfsPathIpns name -> viaIpns name
+        IpfsPathIpfs _    -> viaConfig (remoteUrlScheme url) root
+  where
+    viaIpns name = do
+        logInfo "Updating IPNS"
+        res <-
+            ipfsNamePublish ("/ipfs/" <> cidToText root)
+                            (Just True)       -- resolve
+                            (Just "2540400h") -- lifetime
+                            Nothing           -- ttl (caching)
+                            (Just name)       -- key
+
+        case liftA2 (\name' root' -> name' == name && root' == cidToText root)
+                    (Lens.firstOf nameL  res)
+                    (Lens.firstOf valueL res) of
+            Just True -> pure ()
+            _         -> throwRH $
+                InvalidResponse "ipfsNamePublish: mismatch" res
+
+    viaConfig scheme cid = do
+        remoteName <- asks $ Text.pack . optRemoteName . envOptions
+        let
+            configKey = "remote." <> remoteName <> ".url"
+            remoteUrl = scheme <> "://ipfs/" <> cidToText cid
+         in do
+            logInfo $ "Updating " <> configKey
+            runProcess_ . shell . Text.unpack $
+                "git config " <> configKey <> " " <> remoteUrl
+
 -- lenses
 
 cidL :: Lens.AsValue t => Lens.Traversal' t Text
@@ -280,6 +320,9 @@ pathL = Lens.key "Path" . Lens._String
 keyL :: Lens.AsValue t => Lens.Traversal' t Text
 keyL = Lens.key "Key" . Lens._String
 
+valueL :: Lens.AsValue t => Lens.Traversal' t Text
+valueL = Lens.key "Value" . Lens._String
+
 -- brilliant API design
 isNoLink :: ServantError -> Bool
 isNoLink = \case
@@ -297,6 +340,7 @@ type IPFS =
     :<|> ApiV0Ls
     :<|> ApiV0ObjectPatchAddLink
     :<|> ApiV0Resolve
+    :<|> ApiV0NamePublish
 
 ipfsAdd
     :<|> ipfsBlockPut
@@ -304,6 +348,7 @@ ipfsAdd
     :<|> ipfsList
     :<|> ipfsObjectPatchAddLink
     :<|> ipfsResolve
+    :<|> ipfsNamePublish
     = client
   where
     client = Servant.hoistClient api nat (Servant.client api)

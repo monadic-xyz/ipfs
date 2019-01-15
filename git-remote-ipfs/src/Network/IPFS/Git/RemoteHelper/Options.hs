@@ -2,12 +2,21 @@
 
 module Network.IPFS.Git.RemoteHelper.Options where
 
-import           Control.Applicative ((<|>))
 import           Data.Bifunctor (first)
-import           Data.List (stripPrefix)
+import           Data.IPLD.CID (CID, cidFromText)
+import           Data.List (dropWhileEnd)
+import           Data.Text (Text)
 import qualified Data.Text as Text
+import           Network.URI
+                 ( parseURI
+                 , uriAuthority
+                 , uriPath
+                 , uriRegName
+                 , uriScheme
+                 )
 import           Options.Applicative
                  ( Parser
+                 , ReadM
                  , argument
                  , eitherReader
                  , help
@@ -18,26 +27,30 @@ import           Options.Applicative
                  , strArgument
                  , value
                  )
+import           Servant.Client (BaseUrl(..), Scheme(..), parseBaseUrl)
 
-import           Servant.Client
-                 ( BaseUrl(..)
-                 , Scheme(..)
-                 , parseBaseUrl
-                 , showBaseUrl
-                 )
+import           Network.IPFS.Git.RemoteHelper.Internal (note)
 
-import           Data.IPLD.CID (CID, cidFromText, cidToText)
 
 data Options = Options
-    { optRemoteName :: String
-    , optCid        :: CID
-    , optIpfsUrl    :: BaseUrl
+    { optRemoteName     :: String
+    , optRemoteUrl      :: RemoteUrl
+    , optIpfsApiBaseUrl :: BaseUrl
     }
+
+data RemoteUrl = RemoteUrl
+    { remoteUrlScheme   :: Text
+    , remoteUrlIpfsPath :: IpfsPath
+    }
+
+data IpfsPath
+    = IpfsPathIpfs CID
+    | IpfsPathIpns Text
 
 parseOptions :: Parser Options
 parseOptions = Options
     <$> strArgument (metavar "REMOTE_NAME")
-    <*> argument (eitherReader readCID) (metavar "URL")
+    <*> argument remoteUrl (metavar "URL")
     <*> option (eitherReader (first show . parseBaseUrl))
         ( long  "ipfs-url"
        <> help  "Base URL of the IPFS API"
@@ -45,22 +58,20 @@ parseOptions = Options
        <> showDefault
         )
 
-prettyOptions :: Options -> String
-prettyOptions Options{..} = unlines
-    [ "Options"
-    , "{ optRemoteName = \"" <> optRemoteName <> "\""
-    , ", optCid        = "   <> show (cidToText optCid)
-    , ", optIpfsUrl    = "   <> showBaseUrl optIpfsUrl
-    , "}"
-    ]
-
-readCID :: String -> Either String CID
-readCID s =
-    maybe (Left "Invalid URI scheme") go $
-        stripPrefix "ipfs://" s <|> stripPrefix "ipld://" s
+remoteUrl :: ReadM RemoteUrl
+remoteUrl = eitherReader $ \s -> do
+    uri  <- note "Invalid URI" $ parseURI s
+    let path = dropWhile (== '/') $ uriPath uri
+    ipfs <-
+        case uriRegName <$> uriAuthority uri of
+            Just "ipns" -> pure . IpfsPathIpns . Text.pack $ path
+            _           -> IpfsPathIpfs <$> cidFromString path
+    pure RemoteUrl
+        { remoteUrlScheme   = Text.pack . dropWhileEnd (== ':') $ uriScheme uri
+        , remoteUrlIpfsPath = ipfs
+        }
   where
-    go :: String -> Either String CID
-    go = cidFromText . \case
+    cidFromString = cidFromText . \case
         [] -> emptyRepo
         xs -> Text.pack xs
 

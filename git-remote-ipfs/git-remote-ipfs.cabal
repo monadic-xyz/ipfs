@@ -74,12 +74,14 @@ library
       , mtl
       , multibase
       , multihash-cryptonite
+      , network-uri
       , optparse-applicative
       , safe-exceptions
       , servant
       , servant-client >= 0.15
       , text
       , transformers
+      , typed-process
       , unordered-containers
       , vector
 
@@ -95,8 +97,6 @@ executable git-remote-ipfs
       , conduit
       , conduit-extra
       , git-remote-ipfs
-      , ipld-cid
       , mtl
       , optparse-applicative
       , text
-      , typed-process

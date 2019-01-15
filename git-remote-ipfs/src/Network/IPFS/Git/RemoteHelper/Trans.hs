@@ -11,6 +11,7 @@ module Network.IPFS.Git.RemoteHelper.Trans
     , envDryRun
     , envOptions
     , envClient
+    , envIpfsRoot
 
     , RemoteHelper
     , RemoteHelperT
@@ -34,10 +35,14 @@ module Network.IPFS.Git.RemoteHelper.Trans
 where
 
 import           Control.Exception.Safe
+import qualified Control.Lens as Lens
 import           Control.Monad.Except
 import           Control.Monad.Reader
+import qualified Data.Aeson.Lens as Lens
 import           Data.Bifunctor (first)
 import           Data.IORef (IORef, newIORef, readIORef)
+import           Data.Maybe (fromMaybe)
+import           Data.Proxy (Proxy(..))
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.IO as Text
@@ -57,10 +62,19 @@ import           Data.Git.Monad (GitMonad(..))
 import           Data.Git.Ref (SHA1)
 import           Data.Git.Storage (findRepo, openRepo)
 
-import           Network.HTTP.Client (defaultManagerSettings, newManager)
+import           Network.HTTP.Client
+                 ( defaultManagerSettings
+                 , managerResponseTimeout
+                 , newManager
+                 , responseTimeoutNone
+                 )
 import           Servant.Client.Streaming (mkClientEnv)
 import qualified Servant.Client.Streaming as Servant
 
+import           Data.IPLD.CID (CID, cidFromText)
+import           Network.IPFS.API (ApiV0NameResolve)
+
+import           Network.IPFS.Git.RemoteHelper.Internal (note)
 import           Network.IPFS.Git.RemoteHelper.Options
 
 data Logger = Logger
@@ -76,6 +90,7 @@ data Env = Env
     , envLogger    :: Logger
     , envGit       :: Git SHA1
     , envClient    :: Servant.ClientEnv
+    , envIpfsRoot  :: CID
     }
 
 data RemoteHelperError a = RemoteHelperError
@@ -132,12 +147,12 @@ liftEitherRH =
     liftEither . first (remoteHelperError (freezeCallStack callStack))
 
 
-logInfo :: MonadIO m => Text -> RemoteHelperT e m ()
+logInfo :: (HasCallStack, MonadIO m) => Text -> RemoteHelperT e m ()
 logInfo msg = do
     out <- asks $ _logInfo . envLogger
     v   <- liftIO . readIORef =<< asks envVerbosity
     when (v > 0) $
-        liftIO . out $ msg
+        liftIO . out $ msg <> renderSourceLoc callStack
 
 logDebug :: (HasCallStack, MonadIO m) => Text -> RemoteHelperT e m ()
 logDebug msg = do
@@ -146,7 +161,7 @@ logDebug msg = do
     when (v > 1) $
         liftIO . out $ msg <> renderSourceLoc callStack
 
-logError :: MonadIO m => Text -> RemoteHelperT e m ()
+logError :: (HasCallStack, MonadIO m) => Text -> RemoteHelperT e m ()
 logError msg = do
     out <- asks $ _logError . envLogger
     liftIO . out $ msg <> renderSourceLoc callStack
@@ -167,15 +182,41 @@ defaultLogger = Logger out out out
   where
     out = Text.hPutStrLn stderr
 
-newEnv :: Logger -> Options -> IO Env
+newEnv :: HasCallStack => Logger -> Options -> IO Env
 newEnv envLogger envOptions = do
     envVerbosity <- newIORef 1
     envDryRun    <- newIORef False
     envGit       <- findRepo >>= openRepo
     envClient    <-
-        flip mkClientEnv (optIpfsUrl envOptions)
+        flip mkClientEnv (optIpfsApiBaseUrl envOptions)
             <$> newManager defaultManagerSettings
+                    { managerResponseTimeout = responseTimeoutNone }
+
+    envIpfsRoot  <-
+        case remoteUrlIpfsPath (optRemoteUrl envOptions) of
+            IpfsPathIpfs cid  -> pure cid
+            IpfsPathIpns name -> do
+                _logInfo envLogger $ "Resolving IPNS name " <> name
+                res <-
+                    flip Servant.runClientM envClient $
+                        ipfsNameResolve name
+                                        (Just True)  -- recursive
+                                        Nothing
+                                        Nothing
+                                        Nothing
+                case res of
+                    Left  e -> throwM e
+                    Right v -> either throwString pure $ do
+                        path <-
+                            note "ipfsNameResolve: expected 'Path' key" $
+                                Lens.firstOf (Lens.key "Path" . Lens._String) v
+                        cidFromText
+                            . fromMaybe path
+                            $ Text.stripPrefix "/ipfs/" path
+
     pure Env {..}
+  where
+    ipfsNameResolve = Servant.client (Proxy @ApiV0NameResolve)
 
 runRemoteHelperT
     :: Env
