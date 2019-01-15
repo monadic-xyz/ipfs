@@ -2,7 +2,7 @@
 
 module Network.IPFS.Git.RemoteHelper.Options where
 
-import           Data.Bifunctor (first)
+import           Control.Applicative (liftA2)
 import           Data.IPLD.CID (CID, cidFromText)
 import           Data.List (dropWhileEnd)
 import           Data.Text (Text)
@@ -19,23 +19,16 @@ import           Options.Applicative
                  , ReadM
                  , argument
                  , eitherReader
-                 , help
-                 , long
                  , metavar
-                 , option
-                 , showDefault
                  , strArgument
-                 , value
                  )
-import           Servant.Client (BaseUrl(..), Scheme(..), parseBaseUrl)
 
 import           Network.IPFS.Git.RemoteHelper.Internal (note)
 
 
 data Options = Options
-    { optRemoteName     :: String
-    , optRemoteUrl      :: RemoteUrl
-    , optIpfsApiBaseUrl :: BaseUrl
+    { optRemoteName :: String
+    , optRemoteUrl  :: RemoteUrl
     }
 
 data RemoteUrl = RemoteUrl
@@ -48,15 +41,9 @@ data IpfsPath
     | IpfsPathIpns Text
 
 parseOptions :: Parser Options
-parseOptions = Options
-    <$> strArgument (metavar "REMOTE_NAME")
-    <*> argument remoteUrl (metavar "URL")
-    <*> option (eitherReader (first show . parseBaseUrl))
-        ( long  "ipfs-url"
-       <> help  "Base URL of the IPFS API"
-       <> value (BaseUrl Http "localhost" 5001 mempty)
-       <> showDefault
-        )
+parseOptions = liftA2 Options
+    (strArgument (metavar "REMOTE_NAME"))
+    (argument remoteUrl (metavar "URL"))
 
 remoteUrl :: ReadM RemoteUrl
 remoteUrl = eitherReader $ \s -> do
