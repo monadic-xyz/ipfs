@@ -121,6 +121,7 @@ test-suite e2e-tests
     build-depends:
         base
       , bytestring
+      , entropy
       , filepath
       , gitlib
       , gitlib-libgit2
