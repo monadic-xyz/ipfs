@@ -35,6 +35,9 @@ data Error
     = ParseError String
     | ProcError  ProcessError
 
+instance DisplayError Error where
+    displayError = renderError
+
 renderError :: Error -> Text
 renderError = \case
     ParseError e -> "Command failed to parse: " <> Text.pack e
@@ -58,12 +61,7 @@ main = do
             .| sinkHandle  stdout
 
     case res of
-        Left  e -> do
-            Text.hPutStrLn stderr $
-                   renderError     (errError e)
-                <> renderSourceLoc (errCallStack e)
-            exitFailure
-
+        Left  e -> Text.hPutStrLn stderr (displayError e) *> exitFailure
         Right _ -> exitSuccess
   where
     optInfo = info (helper <*> parseOptions) fullDesc

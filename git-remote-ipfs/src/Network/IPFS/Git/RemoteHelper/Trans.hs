@@ -18,6 +18,8 @@ module Network.IPFS.Git.RemoteHelper.Trans
     , runRemoteHelper
     , runRemoteHelperT
 
+    , DisplayError (..)
+
     , RemoteHelperError
     , errError
     , errCallStack
@@ -25,6 +27,9 @@ module Network.IPFS.Git.RemoteHelper.Trans
     , catchRH
     , mapError
     , liftEitherRH
+
+    , forConcurrently_
+    , forConcurrently
 
     , logInfo
     , logDebug
@@ -34,6 +39,8 @@ module Network.IPFS.Git.RemoteHelper.Trans
     )
 where
 
+import qualified Control.Concurrent.Async as Async
+import           Control.Concurrent.QSem
 import           Control.Exception.Safe
 import qualified Control.Lens as Lens
 import           Control.Monad.Except
@@ -94,10 +101,23 @@ data Env = Env
     , envIpfsRoot  :: CID
     }
 
+class DisplayError a where
+    displayError :: a -> Text
+
 data RemoteHelperError a = RemoteHelperError
     { errCallStack :: CallStack
     , errError     :: a
-    }
+    } deriving Show
+
+instance
+    (Show a, Typeable a, DisplayError a)
+    => Exception (RemoteHelperError a)
+  where
+    displayException = Text.unpack . displayError
+
+instance DisplayError a => DisplayError (RemoteHelperError a) where
+    displayError e =
+        displayError (errError e) <> " " <> renderSourceLoc (errCallStack e)
 
 type RemoteHelper e = RemoteHelperT e IO
 
@@ -147,6 +167,41 @@ liftEitherRH :: (Monad m, HasCallStack) => Either e a -> RemoteHelperT e m a
 liftEitherRH =
     liftEither . first (remoteHelperError (freezeCallStack callStack))
 
+forConcurrently_
+    :: ( Foldable     t
+       , Show         e
+       , Typeable     e
+       , DisplayError e
+       )
+    => Int                         -- ^ Max concurrency
+    -> t a
+    -> (a -> RemoteHelperT e IO b)
+    -> RemoteHelperT e IO ()
+forConcurrently_ maxconc xs f = do
+    env <- ask
+    liftIO $ do
+        sem <- newQSem (max 1 maxconc)
+        Async.forConcurrently_ xs $ \x ->
+            bracket_ (waitQSem sem) (signalQSem sem) $
+                either throwM pure =<< runRemoteHelperT env (f x)
+
+forConcurrently
+    :: ( Traversable  t
+       , Show         e
+       , Typeable     e
+       , DisplayError e
+       )
+    => Int                         -- ^ Max concurrency
+    -> t a
+    -> (a -> RemoteHelperT e IO b)
+    -> RemoteHelperT e IO (t b)
+forConcurrently maxconc xs f = do
+    env <- ask
+    liftIO $ do
+        sem <- newQSem (max 1 maxconc)
+        Async.forConcurrently xs $ \x ->
+            bracket_ (waitQSem sem) (signalQSem sem) $
+                either throwM pure =<< runRemoteHelperT env (f x)
 
 logInfo :: (HasCallStack, MonadIO m) => Text -> RemoteHelperT e m ()
 logInfo msg = do
