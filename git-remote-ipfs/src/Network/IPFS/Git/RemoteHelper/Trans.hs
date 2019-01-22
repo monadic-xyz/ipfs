@@ -12,6 +12,7 @@ module Network.IPFS.Git.RemoteHelper.Trans
     , envOptions
     , envClient
     , envIpfsRoot
+    , envLobs
 
     , RemoteHelper
     , RemoteHelperT
@@ -40,6 +41,7 @@ module Network.IPFS.Git.RemoteHelper.Trans
 where
 
 import qualified Control.Concurrent.Async as Async
+import           Control.Concurrent.MVar (MVar, newMVar)
 import           Control.Concurrent.QSem
 import           Control.Exception.Safe
 import qualified Control.Lens as Lens
@@ -47,6 +49,7 @@ import           Control.Monad.Except
 import           Control.Monad.Reader
 import qualified Data.Aeson.Lens as Lens
 import           Data.Bifunctor (first)
+import           Data.HashMap.Strict (HashMap)
 import           Data.IORef (IORef, newIORef, readIORef)
 import           Data.Maybe (fromMaybe)
 import           Data.Proxy (Proxy(..))
@@ -99,6 +102,7 @@ data Env = Env
     , envGit       :: Git SHA1
     , envClient    :: Servant.ClientEnv
     , envIpfsRoot  :: CID
+    , envLobs      :: MVar (Maybe (HashMap CID CID))
     }
 
 class DisplayError a where
@@ -243,6 +247,7 @@ newEnv envLogger envOptions = do
     envVerbosity <- newIORef 1
     envDryRun    <- newIORef False
     envGit       <- findRepo >>= openRepo
+    envLobs      <- newMVar Nothing
     ipfsBase     <-
         Servant.parseBaseUrl
             =<< fromMaybe "http://localhost:5001" <$> lookupEnv "IPFS_API_URL"

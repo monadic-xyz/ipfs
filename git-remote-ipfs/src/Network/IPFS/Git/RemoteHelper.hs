@@ -205,14 +205,23 @@ processPush _ localRef remoteRef = do
 
 processFetch :: Text -> RemoteHelper ProcessError ()
 processFetch sha = do
-    repo  <- Git.getGit
-    root  <- asks envIpfsRoot
-    cid   <- liftEitherRH . first CidError $ cidFromHexShaText sha
-    lobjs <- ipfs $ largeObjects root -- XXX: load lobjs only once
-    lck   <- liftIO $ newMVar ()
-    go repo root lobjs lck cid
+    repo <- Git.getGit
+    root <- asks envIpfsRoot
+    cid  <- liftEitherRH . first CidError $ cidFromHexShaText sha
+    lck  <- liftIO $ newMVar ()
+    lobs <- do
+        env <- ask
+        (>>= either throwError pure)
+            . liftIO . modifyMVar (envLobs env) $ \case
+                Just ls -> pure (Just ls, Right ls)
+                Nothing ->
+                    runRemoteHelper env (ipfs (largeObjects root)) >>= \case
+                        Left  e  -> pure (Nothing, Left  e)
+                        Right ls -> pure (Just ls, Right ls)
+
+    go repo root lobs lck cid
   where
-    go !repo !root !lobjs lck cid = do
+    go !repo !root !lobs lck cid = do
         ref  <- liftEitherRH . first CidError $ cidToRef @Git.SHA1 cid
         have <-
             -- Nb. mutex here as we might access the same packfile concurrently
@@ -223,7 +232,7 @@ processFetch sha = do
                 fmt ("fetch: Skipping " % fref % " (" % fcid % ")") ref cid
             Nothing -> do
                 raw <- do
-                    blk <- ipfs $ provideBlock lobjs cid
+                    blk <- ipfs $ provideBlock lobs cid
                     case blk of
                         Just  b -> pure b
                         Nothing -> ipfs $ getBlock cid
