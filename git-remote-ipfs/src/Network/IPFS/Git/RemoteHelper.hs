@@ -21,7 +21,7 @@ import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Data.Bifunctor (first)
 import qualified Data.ByteString.Lazy as L
-import           Data.Foldable (foldlM, toList, traverse_)
+import           Data.Foldable (toList, traverse_)
 import           Data.IORef (atomicModifyIORef')
 import           Data.Maybe (catMaybes)
 import           Data.Text (Text)
@@ -155,7 +155,7 @@ processPush _ localRef remoteRef = do
         refCid <- ipfs $ resolvePath (cidToText root <> "/" <> remoteRef)
         pure $ refCid >>= hush . cidFromText
 
-    void $ go root localHeadRef remoteHeadRef
+    go root remoteHeadRef localHeadRef
 
     -- patch link remoteRef
     root' <- ipfs $ patchLink root remoteRef localHeadRef
@@ -170,13 +170,13 @@ processPush _ localRef remoteRef = do
             Nothing -> linkedObject root' "HEAD" "refs/heads/master"
     root'' <$ ipfs (updateRemoteUrl root'')
   where
-    go !base localHeadRef remoteHeadRef
-        | Just localHeadRef == remoteHeadRef = pure base
+    go !root remoteHeadRef localHeadRef
+        | Just localHeadRef == remoteHeadRef = pure ()
         | otherwise = do
 
         logDebug $
             fmt ("processPush: " % fcid % " " % fcid % " " % shown)
-                base
+                root
                 localHeadRef
                 (cidToRef @Git.SHA1 <$> remoteHeadRef)
 
@@ -207,16 +207,16 @@ processPush _ localRef remoteRef = do
 
         logDebug $ fmt ("blockCid: " % fcid) blockCid
 
-        -- if loose object > 2048k, create object + link block to it - WHY?
+        -- if loose object > 2048k, create object + link block to it
         objCid <-
             if L.length raw > 2048000 then
-                linkedObject base ("objects/" <> cidToText blockCid) raw
+                linkedObject root ("objects/" <> cidToText blockCid) raw
             else
                 pure blockCid
 
         logDebug $ fmt ("objCid: " % fcid) objCid
         -- process links
-        foldlM (\b l -> go b l remoteHeadRef) objCid (objectLinks obj)
+        traverse_ (go root remoteHeadRef) (objectLinks obj)
 
     linkedObject base name raw = ipfs $ addObject raw >>= patchLink base name
 
