@@ -2,7 +2,7 @@ timeout: 3600s # Cache misses are slow to rebuild
 steps:
   - id: "Load cache"
     name: gcr.io/cloud-builders/gsutil
-    entrypoint: "bash"
+    entrypoint: bash
     args:
     - "-c"
     - |
@@ -10,9 +10,12 @@ steps:
       load-cache
 
   - id: "Build deps"
+    waitFor:
+    - "Load cache"
     name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
-    env: ["STACK_ROOT=/workspace/.stack"]
-    entrypoint: "bash"
+    env:
+    - STACK_ROOT=/workspace/.stack
+    entrypoint: bash
     dir: "/tmp"
     args:
     - "-c"
@@ -21,36 +24,56 @@ steps:
       stack config set install-ghc --global false
       stack install stylish-haskell hlint weeder
 
+  - id: "Start IPFS daemon"
+    waitFor:
+    - "Load cache"
+    name: "gcr.io/cloud-builders/docker"
+    args:
+    - run
+    - "--name=ipfs-test-network"
+    - "--detach"
+    - "--publish=5001:5001"
+    - "--network=cloudbuild"
+    - "eu.gcr.io/opensourcecoin/ipfs-test-network"
+
   - id: "Format (haskell)"
-    waitFor: ["Build deps"]
+    waitFor:
+    - "Build deps"
     name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
-    args: ["./.ci/check-haskell-format.sh"]
+    args:
+    - "./.ci/check-haskell-format.sh"
 
   - id: "Lint (hlint)"
-    waitFor: ["Build deps"]
+    waitFor:
+    - "Build deps"
     name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
-    args: ["/builder/home/.local/bin/hlint", "."]
+    args:
+    - "/builder/home/.local/bin/hlint"
+    - "."
 
-  - id: "Test & Build"
-    waitFor: ["Build deps"]
+  - id: "Build and Test"
+    waitFor:
+    - "Build deps"
+    name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
+    env:
+    - STACK_ROOT=/workspace/.stack
+    - "IPFS_API_URL=http://ipfs-test-network:5001"
+    args:
+    - "./.ci/build-and-test.sh"
+
+  - id: "Lint (weeder)"
+    waitFor:
+    - "Build and Test"
     name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
     env:
     - STACK_ROOT=/workspace/.stack
     args:
-    - stack
-    - build
-    - "--test"
-    - "--no-terminal"
-    - "--pedantic"
-
-  - id: "Lint (weeder)"
-    name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
-    env: ["STACK_ROOT=/workspace/.stack"] # weeder uses stack under the hood
-    args: ["/builder/home/.local/bin/weeder", "."]
+    - "/builder/home/.local/bin/weeder"
+    - "."
 
   - id: "Save cache"
     name: gcr.io/cloud-builders/gsutil
-    entrypoint: "bash"
+    entrypoint: bash
     args:
     - "-c"
     - |

@@ -55,6 +55,7 @@ import           GHC.Stack
                  , srcLocFile
                  , srcLocStartLine
                  )
+import           System.Environment (lookupEnv)
 import           System.IO (stderr)
 
 import           Data.Git (Git)
@@ -187,8 +188,11 @@ newEnv envLogger envOptions = do
     envVerbosity <- newIORef 1
     envDryRun    <- newIORef False
     envGit       <- findRepo >>= openRepo
+    ipfsBase     <-
+        Servant.parseBaseUrl
+            =<< fromMaybe "http://localhost:5001" <$> lookupEnv "IPFS_API_URL"
     envClient    <-
-        flip mkClientEnv (optIpfsApiBaseUrl envOptions)
+        flip mkClientEnv ipfsBase
             <$> newManager defaultManagerSettings
                     { managerResponseTimeout = responseTimeoutNone }
 
