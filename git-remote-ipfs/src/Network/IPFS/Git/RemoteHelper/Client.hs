@@ -14,6 +14,8 @@ module Network.IPFS.Git.RemoteHelper.Client
     , ClientError
     , renderClientError
 
+    , clientMaxConns
+
     , listPaths
     , getRef
     , resolvePath
@@ -75,6 +77,10 @@ data ClientError
     | InvalidResponse Text Aeson.Value
     | CidError String
     | StreamingError String
+    deriving Show
+
+instance DisplayError ClientError where
+    displayError = renderClientError
 
 renderClientError :: ClientError -> Text
 renderClientError = \case
@@ -90,6 +96,10 @@ data RefPath = RefPath
     }
 
 data RefPathType = RefPathRef | RefPathHead
+
+-- FIXME(kim): We may want this to be configurable somehow
+clientMaxConns :: Int
+clientMaxConns = 30
 
 listPaths
     :: MonadIO m

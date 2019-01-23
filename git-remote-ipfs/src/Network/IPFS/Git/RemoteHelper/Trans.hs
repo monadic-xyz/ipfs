@@ -12,11 +12,14 @@ module Network.IPFS.Git.RemoteHelper.Trans
     , envOptions
     , envClient
     , envIpfsRoot
+    , envLobs
 
     , RemoteHelper
     , RemoteHelperT
     , runRemoteHelper
     , runRemoteHelperT
+
+    , DisplayError (..)
 
     , RemoteHelperError
     , errError
@@ -26,6 +29,9 @@ module Network.IPFS.Git.RemoteHelper.Trans
     , mapError
     , liftEitherRH
 
+    , forConcurrently_
+    , forConcurrently
+
     , logInfo
     , logDebug
     , logError
@@ -34,12 +40,16 @@ module Network.IPFS.Git.RemoteHelper.Trans
     )
 where
 
+import qualified Control.Concurrent.Async as Async
+import           Control.Concurrent.MVar (MVar, newMVar)
+import           Control.Concurrent.QSem
 import           Control.Exception.Safe
 import qualified Control.Lens as Lens
 import           Control.Monad.Except
 import           Control.Monad.Reader
 import qualified Data.Aeson.Lens as Lens
 import           Data.Bifunctor (first)
+import           Data.HashMap.Strict (HashMap)
 import           Data.IORef (IORef, newIORef, readIORef)
 import           Data.Maybe (fromMaybe)
 import           Data.Proxy (Proxy(..))
@@ -92,12 +102,26 @@ data Env = Env
     , envGit       :: Git SHA1
     , envClient    :: Servant.ClientEnv
     , envIpfsRoot  :: CID
+    , envLobs      :: MVar (Maybe (HashMap CID CID))
     }
+
+class DisplayError a where
+    displayError :: a -> Text
 
 data RemoteHelperError a = RemoteHelperError
     { errCallStack :: CallStack
     , errError     :: a
-    }
+    } deriving Show
+
+instance
+    (Show a, Typeable a, DisplayError a)
+    => Exception (RemoteHelperError a)
+  where
+    displayException = Text.unpack . displayError
+
+instance DisplayError a => DisplayError (RemoteHelperError a) where
+    displayError e =
+        displayError (errError e) <> " " <> renderSourceLoc (errCallStack e)
 
 type RemoteHelper e = RemoteHelperT e IO
 
@@ -147,6 +171,41 @@ liftEitherRH :: (Monad m, HasCallStack) => Either e a -> RemoteHelperT e m a
 liftEitherRH =
     liftEither . first (remoteHelperError (freezeCallStack callStack))
 
+forConcurrently_
+    :: ( Foldable     t
+       , Show         e
+       , Typeable     e
+       , DisplayError e
+       )
+    => Int                         -- ^ Max concurrency
+    -> t a
+    -> (a -> RemoteHelperT e IO b)
+    -> RemoteHelperT e IO ()
+forConcurrently_ maxconc xs f = do
+    env <- ask
+    liftIO $ do
+        sem <- newQSem (max 1 maxconc)
+        Async.forConcurrently_ xs $ \x ->
+            bracket_ (waitQSem sem) (signalQSem sem) $
+                either throwM pure =<< runRemoteHelperT env (f x)
+
+forConcurrently
+    :: ( Traversable  t
+       , Show         e
+       , Typeable     e
+       , DisplayError e
+       )
+    => Int                         -- ^ Max concurrency
+    -> t a
+    -> (a -> RemoteHelperT e IO b)
+    -> RemoteHelperT e IO (t b)
+forConcurrently maxconc xs f = do
+    env <- ask
+    liftIO $ do
+        sem <- newQSem (max 1 maxconc)
+        Async.forConcurrently xs $ \x ->
+            bracket_ (waitQSem sem) (signalQSem sem) $
+                either throwM pure =<< runRemoteHelperT env (f x)
 
 logInfo :: (HasCallStack, MonadIO m) => Text -> RemoteHelperT e m ()
 logInfo msg = do
@@ -188,6 +247,7 @@ newEnv envLogger envOptions = do
     envVerbosity <- newIORef 1
     envDryRun    <- newIORef False
     envGit       <- findRepo >>= openRepo
+    envLobs      <- newMVar Nothing
     ipfsBase     <-
         Servant.parseBaseUrl
             =<< fromMaybe "http://localhost:5001" <$> lookupEnv "IPFS_API_URL"
