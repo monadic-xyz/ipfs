@@ -51,7 +51,15 @@ data ProcessError
     | IPFSError       ClientError
     | CidError        String
     | UnknownLocalRef Text
-    | HashMismatch    (Git.Ref Git.SHA1) (Git.Ref Git.SHA1)
+    | HashError       HashMismatch
+    deriving Show
+
+-- | Indicate two hashes expected to be equal aren't.
+--
+-- The data constructors take the expected value first, then the actual.
+data HashMismatch
+    = CidMismatch CID CID
+    | RefMismatch (Git.Ref Git.SHA1) (Git.Ref Git.SHA1)
     deriving Show
 
 instance DisplayError ProcessError where
@@ -63,9 +71,13 @@ renderProcessError = \case
     IPFSError e       -> renderClientError e
     CidError  e       -> fmt ("Cid conversion error: " % fstr) e
     UnknownLocalRef r -> fmt ("Ref not found locally: " % ftxt) r
-    HashMismatch  e a ->
-        fmt ("Hash mismatch: expected `" % fref % "`, actual: `" % fref % "`")
-            e a
+    HashError  e      -> renderHashMismatch e
+
+renderHashMismatch :: HashMismatch -> Text
+renderHashMismatch (CidMismatch e a) =
+    fmt ("Cid mismatch: expected `" % fcid % "`, actual: `" % fcid % "`") e a
+renderHashMismatch (RefMismatch e a) =
+    fmt ("Ref mismatch: expected `" % fref % "`, actual: `" % fref % "`") e a
 
 processCommand :: Command -> RemoteHelper ProcessError CommandResult
 processCommand Capabilities =
@@ -159,7 +171,7 @@ processPush _ localRef remoteRef = do
     unless (Just localRefCid == remoteRefCid) $ go root localRefCid
 
     ipfs $ do
-        -- patch link remoteRef
+        -- Update the root to point to the local ref, up to which we just pushed
         root' <- patchLink root remoteRef localRefCid
 
         -- The remote HEAD denotes the default branch to check out. If it is not
@@ -187,13 +199,7 @@ processPush _ localRef remoteRef = do
 
         blkCid <- ipfs $ putBlock raw
         when (localRefCid /= blkCid) $
-            throwRH . CidError $
-                sfmt ( "CID mismatch:"
-                     % " "
-                     % "expected `" % fcid % "`"
-                     % ", "
-                     % "actual `" % fcid % "`"
-                     ) localRefCid blkCid
+            throwRH $ HashError (CidMismatch localRefCid blkCid)
 
         -- If the object exceeds the maximum block size, bitswap won't replicate
         -- the block. To work around this, we create a regular object and link
@@ -263,7 +269,7 @@ processFetch sha = do
                         <$> maybe (getBlock cid) pure lob
                 ref' <- git $ liftIO . flip Git.setObject obj =<< Git.getGit
                 when (ref' /= ref) $
-                    throwRH $ HashMismatch ref ref'
+                    throwRH $ HashError (RefMismatch ref ref')
 
                 forConcurrently_ clientMaxConns (objectLinks obj) $
                     go repo root lobs lck
