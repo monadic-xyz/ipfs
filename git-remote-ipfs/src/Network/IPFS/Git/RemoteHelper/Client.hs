@@ -24,7 +24,7 @@ module Network.IPFS.Git.RemoteHelper.Client
     , putBlock
     , addObject
     , largeObjects
-    , provideBlock
+    , provideLargeObject
     , getBlock
     , updateRemoteUrl
     )
@@ -204,34 +204,14 @@ largeObjects root = do
 
     toCid = first CidError . cidFromText
 
-provideBlock
+provideLargeObject
     :: (MonadCatch m, MonadIO m)
     => HashMap CID CID
     -> CID
     -> RemoteHelperT ClientError m (Maybe L.ByteString)
-provideBlock largeObjs cid =
-    for (Map.lookup cid largeObjs) $ \cid' -> do
-        contents <-
-            stream $ ipfsCat ("/ipfs/" <> cidToText cid') Nothing Nothing
-
-        -- XXX: go checks cid here by issuing DagPut with the data (reuploading
-        -- what we just got??). Is this necessary? Should the DagPut occur when
-        -- pushing?
-        dag <- ipfsDagPut contents (Just "raw") (Just "git") Nothing Nothing
-        either throwRH pure $ do
-            txt     <-
-                note (InvalidResponse "ipfsDagPut: expected CID in response" dag) $
-                    Lens.firstOf cidL dag
-            realCid <- first CidError $ cidFromText txt
-            if realCid == cid' then
-                pure ()
-            else
-                let
-                    f = "Unexpected CID for provided block: " % ftxt % " " % fcid
-                 in
-                    Left $ CidError (sfmt f txt cid')
-
-        pure contents
+provideLargeObject largeObjs cid =
+    for (Map.lookup cid largeObjs) $ \cid' ->
+        stream $ ipfsCat ("/ipfs/" <> cidToText cid') Nothing Nothing
 
 putBlock :: MonadIO m => L.ByteString -> RemoteHelperT ClientError m CID
 putBlock bs = do
@@ -317,9 +297,6 @@ updateRemoteUrl root = do
 
 -- lenses
 
-cidL :: Lens.AsValue t => Lens.Traversal' t Text
-cidL = Lens.key "Cid" . Lens.key "/" . Lens._String
-
 linksL :: Lens.AsValue t => Lens.Traversal' t Aeson.Value
 linksL = Lens.key "Objects" . Lens.nth 0 . Lens.key "Links" . Lens.values
 
@@ -357,7 +334,6 @@ isNoLink = \case
 type IPFS =
          ApiV0Add
     :<|> ApiV0BlockPut
-    :<|> ApiV0DagPut
     :<|> ApiV0Ls
     :<|> ApiV0ObjectPatchAddLink
     :<|> ApiV0Resolve
@@ -365,7 +341,6 @@ type IPFS =
 
 ipfsAdd
     :<|> ipfsBlockPut
-    :<|> ipfsDagPut
     :<|> ipfsList
     :<|> ipfsObjectPatchAddLink
     :<|> ipfsResolve

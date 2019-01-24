@@ -51,6 +51,7 @@ data ProcessError
     | IPFSError       ClientError
     | CidError        String
     | UnknownLocalRef Text
+    | HashMismatch    (Git.Ref Git.SHA1) (Git.Ref Git.SHA1)
     deriving Show
 
 instance DisplayError ProcessError where
@@ -62,6 +63,9 @@ renderProcessError = \case
     IPFSError e       -> renderClientError e
     CidError  e       -> fmt ("Cid conversion error: " % fstr) e
     UnknownLocalRef r -> fmt ("Ref not found locally: " % ftxt) r
+    HashMismatch  e a ->
+        fmt ("Hash mismatch: expected `" % fref % "`, actual: `" % fref % "`")
+            e a
 
 processCommand :: Command -> RemoteHelper ProcessError CommandResult
 processCommand Capabilities =
@@ -253,15 +257,14 @@ processFetch sha = do
             Just  _ -> logInfo $
                 fmt ("fetch: Skipping " % fref % " (" % fcid % ")") ref cid
             Nothing -> do
-                raw <- do
-                    blk <- ipfs $ provideBlock lobs cid
-                    case blk of
-                        Just  b -> pure b
-                        Nothing -> ipfs $ getBlock cid
+                obj  <- ipfs $ do
+                    lob <- provideLargeObject lobs cid
+                    Git.looseUnmarshall @Git.SHA1
+                        <$> maybe (getBlock cid) pure lob
+                ref' <- git $ liftIO . flip Git.setObject obj =<< Git.getGit
+                when (ref' /= ref) $
+                    throwRH $ HashMismatch ref ref'
 
-                let obj = Git.looseUnmarshall @Git.SHA1 raw
-                void . git . liftIO $
-                    Git.looseWrite (Git.gitRepoPath repo) obj -- XXX: check sha matches
                 forConcurrently_ clientMaxConns (objectLinks obj) $
                     go repo root lobs lck
 
