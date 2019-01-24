@@ -10,6 +10,7 @@ module Network.IPFS.Git.RemoteHelper.Trans
     , envVerbosity
     , envDryRun
     , envOptions
+    , envIpfsOptions
     , envClient
     , envIpfsRoot
     , envLobs
@@ -65,7 +66,6 @@ import           GHC.Stack
                  , srcLocFile
                  , srcLocStartLine
                  )
-import           System.Environment (lookupEnv)
 import           System.IO (stderr)
 
 import           Data.Git (Git)
@@ -95,14 +95,15 @@ data Logger = Logger
     }
 
 data Env = Env
-    { envVerbosity :: IORef Word
-    , envDryRun    :: IORef Bool
-    , envOptions   :: Options
-    , envLogger    :: Logger
-    , envGit       :: Git SHA1
-    , envClient    :: Servant.ClientEnv
-    , envIpfsRoot  :: CID
-    , envLobs      :: MVar (Maybe (HashMap CID CID))
+    { envVerbosity   :: IORef Word
+    , envDryRun      :: IORef Bool
+    , envOptions     :: Options
+    , envIpfsOptions :: IpfsOptions
+    , envLogger      :: Logger
+    , envGit         :: Git SHA1
+    , envClient      :: Servant.ClientEnv
+    , envIpfsRoot    :: CID
+    , envLobs        :: MVar (Maybe (HashMap CID CID))
     }
 
 class DisplayError a where
@@ -242,17 +243,14 @@ defaultLogger = Logger out out out
   where
     out = Text.hPutStrLn stderr
 
-newEnv :: HasCallStack => Logger -> Options -> IO Env
-newEnv envLogger envOptions = do
+newEnv :: HasCallStack => Logger -> Options -> IpfsOptions -> IO Env
+newEnv envLogger envOptions envIpfsOptions = do
     envVerbosity <- newIORef 1
     envDryRun    <- newIORef False
     envGit       <- findRepo >>= openRepo
     envLobs      <- newMVar Nothing
-    ipfsBase     <-
-        Servant.parseBaseUrl
-            =<< fromMaybe "http://localhost:5001" <$> lookupEnv "IPFS_API_URL"
     envClient    <-
-        flip mkClientEnv ipfsBase
+        flip mkClientEnv (ipfsApiUrl envIpfsOptions)
             <$> newManager defaultManagerSettings
                     { managerResponseTimeout = responseTimeoutNone }
 
