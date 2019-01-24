@@ -26,8 +26,6 @@ import           Data.IORef (atomicModifyIORef')
 import           Data.Maybe (catMaybes)
 import           Data.Text (Text)
 import qualified Data.Text as Text
-import           Data.Text.Encoding (decodeUtf8With)
-import           Data.Text.Encoding.Error (lenientDecode)
 import qualified Data.Text.Read as Text
 import           Data.Traversable (for)
 import           GHC.Stack (HasCallStack)
@@ -40,6 +38,7 @@ import qualified Data.Git.Ref as Git
 import qualified Data.Git.Revision as Git
 import qualified Data.Git.Storage as Git
 import qualified Data.Git.Storage.Loose as Git
+import qualified Data.Git.Storage.Object as Git
 
 import           Network.IPFS.Git.RemoteHelper.Client
 import           Network.IPFS.Git.RemoteHelper.Command
@@ -155,18 +154,19 @@ processPush _ localRef remoteRef = do
 
     unless (Just localRefCid == remoteRefCid) $ go root localRefCid
 
-    -- patch link remoteRef
-    root' <- ipfs $ patchLink root remoteRef localRefCid
+    ipfs $ do
+        -- patch link remoteRef
+        root' <- patchLink root remoteRef localRefCid
 
-    -- The remote HEAD denotes the default branch to check out. If it is not
-    -- present, git clone will refuse to check out the worktree and exit with a
-    -- scary error message.
-    hEAD <- ipfs $ getRef "HEAD"
-    root'' <-
-        case hEAD of
-            Just  _ -> pure root'
-            Nothing -> linkedObject root' "HEAD" "refs/heads/master"
-    root'' <$ ipfs (updateRemoteUrl root'')
+        -- The remote HEAD denotes the default branch to check out. If it is not
+        -- present, git clone will refuse to check out the worktree and exit with a
+        -- scary error message.
+        root'' <-
+            getRef "HEAD" >>= \case
+                Just  _ -> pure root'
+                Nothing -> addObject "refs/heads/master" >>= patchLink root' "HEAD"
+
+        root'' <$ updateRemoteUrl root'
   where
     go !root localRefCid = do
         logDebug $ fmt ("processPush: " % fcid % " " % fcid) root localRefCid
@@ -180,28 +180,49 @@ processPush _ localRef remoteRef = do
 
         let raw = Git.looseMarshall obj
 
-        logDebug $ "BlockPut: " <> decodeUtf8With lenientDecode (L.toStrict raw)
-        blockCid <- do
-            cid <- ipfs $ putBlock raw
-            -- check 'res' CID matches SHA
-            when (localRefCid /= cid) $
-                throwRH
-                    . CidError
-                    $ sfmt ("CID mismatch: expected `" % fcid % "`, actual `" % fcid % "`")
-                           localRefCid
-                           cid
-            pure cid
+        blkCid <- ipfs $ putBlock raw
+        when (localRefCid /= blkCid) $
+            throwRH . CidError $
+                sfmt ( "CID mismatch:"
+                     % " "
+                     % "expected `" % fcid % "`"
+                     % ", "
+                     % "actual `" % fcid % "`"
+                     ) localRefCid blkCid
 
-        logDebug $ fmt ("blockCid: " % fcid) blockCid
-
-        -- if loose object > 2048k, create object + link block to it
-        when (L.length raw > 2048000) $
-            void $ linkedObject root ("objects/" <> cidToText blockCid) raw
+        -- If the object exceeds the maximum block size, bitswap won't replicate
+        -- the block. To work around this, we create a regular object and link
+        -- it to the root object as @objects/<block CID>@.
+        --
+        -- As suggested by
+        -- <https://github.com/ipfs-shipyard/git-remote-ipld/issues/12>, objects
+        -- can potentially be deduplicated by storing the data separate from the
+        -- header. This only makes sense for git blobs, so we don't bother for
+        -- other object types.
+        when (L.length raw > fromIntegral clientMaxBlockSize) $
+            let
+                linkName = "objects/" <> cidToText blkCid
+             in
+                case obj of
+                    Git.ObjBlob blob -> pushLargeBlob blob root linkName
+                    _                ->
+                        void . ipfs $
+                            addObject raw >>= patchLink root linkName
 
         -- process links
         forConcurrently_ clientMaxConns (objectLinks obj) $ go root
 
-    linkedObject base name raw = ipfs $ addObject raw >>= patchLink base name
+    pushLargeBlob blob root linkName =
+        let
+            hdr = L.fromStrict $ Git.objectWriteHeader Git.TypeBlob len
+            len = fromIntegral $ L.length dat
+            dat = Git.objectWrite (Git.ObjBlob blob)
+         in ipfs $ do
+                hdrCid <- addObject hdr
+                datCid <- addObject dat
+                void $
+                    patchLink hdrCid "0"      datCid >>=
+                    patchLink root   linkName
 
 processFetch :: Text -> RemoteHelper ProcessError ()
 processFetch sha = do
