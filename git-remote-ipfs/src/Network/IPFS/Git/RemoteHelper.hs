@@ -175,8 +175,9 @@ processPush _ localRef remoteRef = do
                 liftEitherRH . first CidError $
                     cidToRef @Git.SHA1 localRefCid
             logDebug $ "sha " <> Text.pack (show sha)
-            dir <- Git.gitRepoPath <$> Git.getGit
-            git . liftIO $ Git.looseRead dir sha
+            git $ do
+                g <- Git.getGit
+                liftIO $ Git.getObject_ g sha True
 
         let raw = Git.looseMarshall obj
 
