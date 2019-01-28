@@ -32,6 +32,8 @@ module Network.IPFS.Git.RemoteHelper.Trans
     , mapError
     , liftEitherRH
 
+    , concurrently
+    , concurrently_
     , forConcurrently_
     , forConcurrently
 
@@ -180,6 +182,28 @@ mapError f (RemoteHelperT ma) =
 liftEitherRH :: (Monad m, HasCallStack) => Either e a -> RemoteHelperT e m a
 liftEitherRH =
     liftEither . first (remoteHelperError (freezeCallStack callStack))
+
+concurrently
+    :: (Show e, Typeable e, DisplayError e)
+    => RemoteHelperT e IO a
+    -> RemoteHelperT e IO b
+    -> RemoteHelperT e IO (a, b)
+concurrently left right = do
+    env <- ask
+    liftIO $ Async.concurrently
+        (either throwM pure =<< runRemoteHelperT env left)
+        (either throwM pure =<< runRemoteHelperT env right)
+
+concurrently_
+    :: (Show e, Typeable e, DisplayError e)
+    => RemoteHelperT e IO a
+    -> RemoteHelperT e IO b
+    -> RemoteHelperT e IO ()
+concurrently_ left right = do
+    env <- ask
+    liftIO $ Async.concurrently_
+        (either throwM pure =<< runRemoteHelperT env left)
+        (either throwM pure =<< runRemoteHelperT env right)
 
 forConcurrently_
     :: ( Foldable     t

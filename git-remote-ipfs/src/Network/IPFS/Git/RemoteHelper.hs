@@ -187,12 +187,12 @@ processPush _ localRef remoteRef = do
     ipfs $ do
         -- Update the root to point to the local ref, up to which we just pushed
         root' <- patchLink root remoteRef localRefCid
-
         -- The remote HEAD denotes the default branch to check out. If it is not
-        -- present, git clone will refuse to check out the worktree and exit with a
-        -- scary error message.
-        root'' <- linkedObject "refs/heads/master" root' "HEAD"
-        root'' <$ updateRemoteUrl root''
+        -- present, git clone will refuse to check out the worktree and exit
+        -- with a scary error message.
+        linkedObject "refs/heads/master" root' "HEAD" >>= \hEAD ->
+            -- HEAD is our new root, update the remote.url and pin
+            hEAD <$ concurrently_ (updateRemoteUrl hEAD) (pin hEAD)
   where
     go !root localRefCid = do
         logDebug $ fmt ("processPush: " % fcid % " " % fcid) root localRefCid
@@ -257,6 +257,7 @@ processFetch sha = do
                         Right ls -> pure (Just ls, Right ls)
 
     go root lobs cid
+    void . ipfs $ pin root
   where
     go !root !lobs cid = do
         ref  <- liftEitherRH . first CidError $ cidToRef @Git.SHA1 cid

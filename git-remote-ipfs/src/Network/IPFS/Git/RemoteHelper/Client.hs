@@ -20,6 +20,7 @@ module Network.IPFS.Git.RemoteHelper.Client
     , patchLink
     , putBlock
     , addObject
+    , pin
     , largeObjects
     , provideLargeObject
     , getBlock
@@ -223,23 +224,31 @@ addObject bs = do
     invalidResponse = InvalidResponse "ipfsAdd: expected 'Hash' key"
 
     ipfsAdd' bs' =
-        ipfsAdd bs'
-                Nothing
-                Nothing
-                Nothing
-                Nothing
-                Nothing
-                Nothing
-                Nothing
-                Nothing
-                Nothing
-                Nothing
-                Nothing
-                Nothing
-                Nothing
-                Nothing
-                Nothing
-                Nothing
+        ipfsAdd bs'         -- data
+                Nothing     -- recursive
+                Nothing     -- quiet
+                Nothing     -- quieter
+                Nothing     -- silent
+                Nothing     -- progress
+                Nothing     -- trickle
+                Nothing     -- only-hash
+                Nothing     -- wrap-with-directory
+                Nothing     -- hidden
+                Nothing     -- chunker
+                (Just True) -- pin
+                Nothing     -- raw-leaves
+                Nothing     -- nocopy
+                Nothing     -- fscache
+                Nothing     -- cid-version
+                Nothing     -- hash function
+
+pin :: MonadIO m => CID -> RemoteHelperT ClientError m [CID]
+pin cid = do
+    res <- ipfsPinAdd (cidToText cid)
+                      (Just True)     -- recursive
+                      (Just False)    -- progress
+    liftEitherRH $
+        traverse (first CidError . cidFromText) $ Lens.toListOf pinsL res
 
 getBlock
     :: (MonadCatch m, MonadIO m)
@@ -312,6 +321,9 @@ keyL = Lens.key "Key" . Lens._String
 valueL :: Lens.AsValue t => Lens.Traversal' t Text
 valueL = Lens.key "Value" . Lens._String
 
+pinsL :: Lens.AsValue t => Lens.IndexedTraversal' Int t Text
+pinsL = Lens.key "Pins" . Lens.values . Lens._String
+
 -- brilliant API design
 isNoLink :: ServantError -> Bool
 isNoLink = \case
@@ -329,6 +341,7 @@ type IPFS =
     :<|> ApiV0ObjectPatchAddLink
     :<|> ApiV0Resolve
     :<|> ApiV0NamePublish
+    :<|> ApiV0PinAdd
 
 ipfsAdd
     :<|> ipfsBlockPut
@@ -336,6 +349,7 @@ ipfsAdd
     :<|> ipfsObjectPatchAddLink
     :<|> ipfsResolve
     :<|> ipfsNamePublish
+    :<|> ipfsPinAdd
     = client
   where
     client = Servant.hoistClient api nat (Servant.client api)
@@ -377,3 +391,4 @@ stream m = do
             Right s -> runExceptT (runSourceT s) >>= \case
                 Left  e'  -> throwString e'
                 Right bss -> pure $ L.fromChunks bss
+
