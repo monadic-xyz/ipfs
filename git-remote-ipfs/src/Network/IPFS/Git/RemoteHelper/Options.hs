@@ -131,7 +131,7 @@ remoteUrl = eitherReader $ \s -> do
 -- repository).
 --
 -- 'IpfsOptions' are configured using @git-config(2)@. The precedence rules
--- specified there appy. However, @$XDG_CONFIG_HOME/git/config@ and
+-- specified there apply. However, @$XDG_CONFIG_HOME/git/config@ and
 -- @$(prefix)/etc/gitconfig@ (i.e. @--system@) are __not__ yet supported.
 --
 -- The available configuration keys are:
