@@ -191,12 +191,8 @@ processPush _ localRef remoteRef = do
         -- The remote HEAD denotes the default branch to check out. If it is not
         -- present, git clone will refuse to check out the worktree and exit with a
         -- scary error message.
-        root'' <-
-            getRef "HEAD" >>= \case
-                Just  _ -> pure root'
-                Nothing -> addObject "refs/heads/master" >>= patchLink root' "HEAD"
-
-        root'' <$ updateRemoteUrl root'
+        root'' <- linkedObject "refs/heads/master" root' "HEAD"
+        root'' <$ updateRemoteUrl root''
   where
     go !root localRefCid = do
         logDebug $ fmt ("processPush: " % fcid % " " % fcid) root localRefCid
