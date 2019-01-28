@@ -14,9 +14,6 @@ module Network.IPFS.Git.RemoteHelper.Client
     , ClientError
     , renderClientError
 
-    , clientMaxConns
-    , clientMaxBlockSize
-
     , listPaths
     , getRef
     , resolvePath
@@ -97,13 +94,6 @@ data RefPath = RefPath
     }
 
 data RefPathType = RefPathRef | RefPathHead
-
--- FIXME(kim): We may want this to be configurable somehow
-clientMaxConns :: Int
-clientMaxConns = 30
-
-clientMaxBlockSize :: Int
-clientMaxBlockSize = 2048000
 
 listPaths
     :: MonadIO m

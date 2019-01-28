@@ -44,6 +44,7 @@ import           Network.IPFS.Git.RemoteHelper.Client
 import           Network.IPFS.Git.RemoteHelper.Command
 import           Network.IPFS.Git.RemoteHelper.Format
 import           Network.IPFS.Git.RemoteHelper.Internal
+import           Network.IPFS.Git.RemoteHelper.Options (IpfsOptions'(..))
 import           Network.IPFS.Git.RemoteHelper.Trans
 
 data ProcessError
@@ -128,8 +129,9 @@ processCommand ListForPush = fmap ListForPushResult $ do
     logDebug $ fmt ("list for-push: branches: " % shown) branches
 
     remoteRefs <- do
-        cids <-
-            forConcurrently clientMaxConns branches $ \branch ->
+        cids <- do
+            maxconns <- asks $ ipfsMaxConns . envIpfsOptions
+            forConcurrently maxconns branches $ \branch ->
                 ipfs (resolvePath (cidToText root <> "/" <> branch))
 
         for (catMaybes cids) $
@@ -201,6 +203,7 @@ processPush _ localRef remoteRef = do
         when (localRefCid /= blkCid) $
             throwRH $ HashError (CidMismatch localRefCid blkCid)
 
+        IpfsOptions { ipfsMaxConns, ipfsMaxBlockSize } <- asks envIpfsOptions
         -- If the object exceeds the maximum block size, bitswap won't replicate
         -- the block. To work around this, we create a regular object and link
         -- it to the root object as @objects/<block CID>@.
@@ -210,7 +213,7 @@ processPush _ localRef remoteRef = do
         -- can potentially be deduplicated by storing the data separate from the
         -- header. This only makes sense for git blobs, so we don't bother for
         -- other object types.
-        when (L.length raw > fromIntegral clientMaxBlockSize) $
+        when (L.length raw > fromIntegral ipfsMaxBlockSize) $
             let
                 linkName = "objects/" <> cidToText blkCid
              in
@@ -221,7 +224,7 @@ processPush _ localRef remoteRef = do
                             addObject raw >>= patchLink root linkName
 
         -- process links
-        forConcurrently_ clientMaxConns (objectLinks obj) $ go root
+        forConcurrently_ ipfsMaxConns (objectLinks obj) $ go root
 
     pushLargeBlob blob root linkName =
         let
@@ -267,11 +270,13 @@ processFetch sha = do
                     lob <- provideLargeObject lobs cid
                     Git.looseUnmarshall @Git.SHA1
                         <$> maybe (getBlock cid) pure lob
+
                 ref' <- git $ liftIO . flip Git.setObject obj =<< Git.getGit
                 when (ref' /= ref) $
                     throwRH $ HashError (RefMismatch ref ref')
 
-                forConcurrently_ clientMaxConns (objectLinks obj) $
+                maxconns <- asks $ ipfsMaxConns . envIpfsOptions
+                forConcurrently_ maxconns (objectLinks obj) $
                     go repo root lobs lck
 
 --------------------------------------------------------------------------------

@@ -47,7 +47,8 @@ main :: IO ()
 main = do
     for_ [stdin, stdout, stderr] $ flip hSetBuffering LineBuffering
 
-    env <- execParser optInfo >>= newEnv defaultLogger
+    opt <- execParser optInfo
+    env <- newEnv defaultLogger opt =<< getIpfsOptions opt
     res <-
         runRemoteHelper env . runConduit $
                sourceHandle stdin

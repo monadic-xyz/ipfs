@@ -58,6 +58,7 @@ library
         Network.IPFS.Git.RemoteHelper.Client
         Network.IPFS.Git.RemoteHelper.Command
         Network.IPFS.Git.RemoteHelper.Format
+        Network.IPFS.Git.RemoteHelper.Generic
         Network.IPFS.Git.RemoteHelper.Internal
         Network.IPFS.Git.RemoteHelper.Options
         Network.IPFS.Git.RemoteHelper.Trans
@@ -71,6 +72,7 @@ library
       , cryptonite
       , filepath
       , formatting
+      , generics-sop
       , git
       , http-client
       , ipfs-api
