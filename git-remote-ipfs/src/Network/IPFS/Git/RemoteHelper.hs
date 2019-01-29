@@ -10,7 +10,7 @@ module Network.IPFS.Git.RemoteHelper
     )
 where
 
-import           Control.Concurrent.MVar (modifyMVar, newMVar, withMVar)
+import           Control.Concurrent.MVar (modifyMVar)
 import           Control.Exception.Safe
                  ( MonadCatch
                  , SomeException
@@ -33,12 +33,18 @@ import           System.FilePath (joinPath, splitDirectories)
 
 import           Data.IPLD.CID (CID, cidFromText, cidToText)
 
-import qualified Data.Git.Monad as Git
-import qualified Data.Git.Ref as Git
-import qualified Data.Git.Revision as Git
-import qualified Data.Git.Storage as Git
-import qualified Data.Git.Storage.Loose as Git
+import qualified Data.Git.Monad as Git (getGit, liftGit)
+import qualified Data.Git.Ref as Git (Ref, SHA1)
+import qualified Data.Git.Repository as Git (branchList, resolveRevision)
+import qualified Data.Git.Revision as Git (Revision(..))
+import qualified Data.Git.Storage as Git (Git, getObject, getObject_, setObject)
+import qualified Data.Git.Storage.Loose as Git (looseMarshall, looseUnmarshall)
 import qualified Data.Git.Storage.Object as Git
+                 ( Object(ObjBlob)
+                 , ObjectType(TypeBlob)
+                 , objectWrite
+                 , objectWriteHeader
+                 )
 
 import           Network.IPFS.Git.RemoteHelper.Client
 import           Network.IPFS.Git.RemoteHelper.Command
@@ -80,7 +86,10 @@ renderHashMismatch (CidMismatch e a) =
 renderHashMismatch (RefMismatch e a) =
     fmt ("Ref mismatch: expected `" % fref % "`, actual: `" % fref % "`") e a
 
-processCommand :: Command -> RemoteHelper ProcessError CommandResult
+processCommand
+    :: HasCallStack
+    => Command
+    -> RemoteHelper ProcessError CommandResult
 processCommand Capabilities =
     pure $ CapabilitiesResult ["push", "fetch", "option"]
 
@@ -123,15 +132,13 @@ processCommand List = fmap ListResult $ do
 
 processCommand ListForPush = fmap ListForPushResult $ do
     root     <- asks envIpfsRoot
-    branches <- do
-        branches <- git Git.branchList
-        pure . map (fmt $ "refs/heads/" % frefName) $ toList branches
+    branches <-
+        map (fmt $ "refs/heads/" % frefName) . toList <$> git Git.branchList
     logDebug $ fmt ("list for-push: branches: " % shown) branches
 
     remoteRefs <- do
-        cids <- do
-            maxconns <- asks $ ipfsMaxConns . envIpfsOptions
-            forConcurrently maxconns branches $ \branch ->
+        cids <-
+            forConcurrently branches $ \branch ->
                 ipfs (resolvePath (cidToText root <> "/" <> branch))
 
         for (catMaybes cids) $
@@ -158,12 +165,17 @@ processCommand (Fetch sha _) = FetchOk <$ processFetch sha
 
 --------------------------------------------------------------------------------
 
-processPush :: Bool -> Text -> Text -> RemoteHelper ProcessError CID
+processPush
+    :: HasCallStack
+    => Bool
+    -> Text
+    -> Text
+    -> RemoteHelper ProcessError CID
 processPush _ localRef remoteRef = do
     root <- asks envIpfsRoot
 
     localRefCid <- do
-        ref <- git $ Git.resolve (Git.Revision (Text.unpack localRef) [])
+        ref <- git $ flip Git.resolveRevision (Git.Revision (Text.unpack localRef) [])
         maybe (throwRH $ UnknownLocalRef localRef) (pure . refToCid) ref
 
     remoteRefCid <- do
@@ -175,16 +187,12 @@ processPush _ localRef remoteRef = do
     ipfs $ do
         -- Update the root to point to the local ref, up to which we just pushed
         root' <- patchLink root remoteRef localRefCid
-
         -- The remote HEAD denotes the default branch to check out. If it is not
-        -- present, git clone will refuse to check out the worktree and exit with a
-        -- scary error message.
-        root'' <-
-            getRef "HEAD" >>= \case
-                Just  _ -> pure root'
-                Nothing -> addObject "refs/heads/master" >>= patchLink root' "HEAD"
-
-        root'' <$ updateRemoteUrl root'
+        -- present, git clone will refuse to check out the worktree and exit
+        -- with a scary error message.
+        linkedObject "refs/heads/master" root' "HEAD" >>= \hEAD ->
+            -- HEAD is our new root, update the remote.url and pin
+            hEAD <$ concurrently_ (updateRemoteUrl hEAD) (pin hEAD)
   where
     go !root localRefCid = do
         logDebug $ fmt ("processPush: " % fcid % " " % fcid) root localRefCid
@@ -193,9 +201,7 @@ processPush _ localRef remoteRef = do
                 liftEitherRH . first CidError $
                     cidToRef @Git.SHA1 localRefCid
             logDebug $ "sha " <> Text.pack (show sha)
-            git $ do
-                g <- Git.getGit
-                liftIO $ Git.getObject_ g sha True
+            git $ \repo -> Git.getObject_ repo sha True
 
         let raw = Git.looseMarshall obj
 
@@ -203,7 +209,6 @@ processPush _ localRef remoteRef = do
         when (localRefCid /= blkCid) $
             throwRH $ HashError (CidMismatch localRefCid blkCid)
 
-        IpfsOptions { ipfsMaxConns, ipfsMaxBlockSize } <- asks envIpfsOptions
         -- If the object exceeds the maximum block size, bitswap won't replicate
         -- the block. To work around this, we create a regular object and link
         -- it to the root object as @objects/<block CID>@.
@@ -213,37 +218,34 @@ processPush _ localRef remoteRef = do
         -- can potentially be deduplicated by storing the data separate from the
         -- header. This only makes sense for git blobs, so we don't bother for
         -- other object types.
-        when (L.length raw > fromIntegral ipfsMaxBlockSize) $
-            let
-                linkName = "objects/" <> cidToText blkCid
-             in
+        maxBlockSize <- asks $ fromIntegral . ipfsMaxBlockSize . envIpfsOptions
+        when (L.length raw > maxBlockSize) $ do
+            let linkName = "objects/" <> cidToText blkCid
+            void . ipfs $
                 case obj of
                     Git.ObjBlob blob -> pushLargeBlob blob root linkName
-                    _                ->
-                        void . ipfs $
-                            addObject raw >>= patchLink root linkName
+                    _                -> linkedObject  raw  root linkName
 
         -- process links
-        forConcurrently_ ipfsMaxConns (objectLinks obj) $ go root
+        forConcurrently_ (objectLinks obj) $ go root
 
     pushLargeBlob blob root linkName =
         let
             hdr = L.fromStrict $ Git.objectWriteHeader Git.TypeBlob len
             len = fromIntegral $ L.length dat
             dat = Git.objectWrite (Git.ObjBlob blob)
-         in ipfs $ do
-                hdrCid <- addObject hdr
-                datCid <- addObject dat
-                void $
-                    patchLink hdrCid "0"      datCid >>=
-                    patchLink root   linkName
+         in do
+            hdrCid <- addObject hdr
+            datCid <- addObject dat
+            patchLink hdrCid "0" datCid >>= patchLink root linkName
 
-processFetch :: Text -> RemoteHelper ProcessError ()
+    linkedObject bytes root linkName =
+        addObject bytes >>= patchLink root linkName
+
+processFetch :: HasCallStack => Text -> RemoteHelper ProcessError ()
 processFetch sha = do
-    repo <- Git.getGit
     root <- asks envIpfsRoot
     cid  <- liftEitherRH . first CidError $ cidFromHexShaText sha
-    lck  <- liftIO $ newMVar ()
     lobs <- do
         env <- ask
         (>>= either throwError pure)
@@ -254,30 +256,27 @@ processFetch sha = do
                         Left  e  -> pure (Nothing, Left  e)
                         Right ls -> pure (Just ls, Right ls)
 
-    go repo root lobs lck cid
+    go root lobs cid
+    void . ipfs $ pin root
   where
-    go !repo !root !lobs lck cid = do
+    go !root !lobs cid = do
         ref  <- liftEitherRH . first CidError $ cidToRef @Git.SHA1 cid
-        have <-
-            -- Nb. mutex here as we might access the same packfile concurrently
-            git . liftIO . withMVar lck . const $
-                Git.getObject repo ref True
+        have <- git $ \repo -> Git.getObject repo ref True
         case have of
-            Just  _ -> logInfo $
-                fmt ("fetch: Skipping " % fref % " (" % fcid % ")") ref cid
+            Just  _ ->
+                logInfo $
+                    fmt ("fetch: Skipping " % fref % " (" % fcid % ")") ref cid
             Nothing -> do
                 obj  <- ipfs $ do
                     lob <- provideLargeObject lobs cid
                     Git.looseUnmarshall @Git.SHA1
                         <$> maybe (getBlock cid) pure lob
 
-                ref' <- git $ liftIO . flip Git.setObject obj =<< Git.getGit
+                ref' <- git $ flip Git.setObject obj
                 when (ref' /= ref) $
                     throwRH $ HashError (RefMismatch ref ref')
 
-                maxconns <- asks $ ipfsMaxConns . envIpfsOptions
-                forConcurrently_ maxconns (objectLinks obj) $
-                    go repo root lobs lck
+                forConcurrently_ (objectLinks obj) $ go root lobs
 
 --------------------------------------------------------------------------------
 
@@ -288,7 +287,10 @@ ipfs = mapError IPFSError
 
 -- XXX: hs-git uses 'error' deliberately, should be using 'tryAnyDeep' here.
 -- Requires patch to upstream to get 'NFData' instances everywhere.
-git :: (MonadCatch m, HasCallStack)
-    => RemoteHelperT ProcessError m a
+git :: (MonadCatch m, MonadIO m, HasCallStack)
+    => (Git.Git Git.SHA1 -> IO a)
     -> RemoteHelperT ProcessError m a
-git f = either throwRH pure =<< fmap (first GitError) (tryAny f)
+git f = do
+    repo <- Git.getGit
+    res  <- Git.liftGit $ first GitError <$> tryAny (f repo)
+    either throwRH pure res

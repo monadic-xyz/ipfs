@@ -11,7 +11,9 @@ module Network.IPFS.Git.RemoteHelper.Trans
     , envDryRun
     , envOptions
     , envIpfsOptions
+    , envGit
     , envClient
+    , envClientSem
     , envIpfsRoot
     , envLobs
 
@@ -30,6 +32,8 @@ module Network.IPFS.Git.RemoteHelper.Trans
     , mapError
     , liftEitherRH
 
+    , concurrently
+    , concurrently_
     , forConcurrently_
     , forConcurrently
 
@@ -42,7 +46,7 @@ module Network.IPFS.Git.RemoteHelper.Trans
 where
 
 import qualified Control.Concurrent.Async as Async
-import           Control.Concurrent.MVar (MVar, newMVar)
+import           Control.Concurrent.MVar (MVar, newMVar, withMVar)
 import           Control.Concurrent.QSem
 import           Control.Exception.Safe
 import qualified Control.Lens as Lens
@@ -101,7 +105,9 @@ data Env = Env
     , envIpfsOptions :: IpfsOptions
     , envLogger      :: Logger
     , envGit         :: Git SHA1
+    , envGitMutex    :: MVar ()
     , envClient      :: Servant.ClientEnv
+    , envClientSem   :: QSem
     , envIpfsRoot    :: CID
     , envLobs        :: MVar (Maybe (HashMap CID CID))
     }
@@ -140,8 +146,13 @@ newtype RemoteHelperT e m a = RemoteHelperT
                )
 
 instance MonadIO m => GitMonad (RemoteHelperT e m) where
-    getGit  = asks envGit
-    liftGit = liftIO
+    getGit    = asks envGit
+    liftGit f = do
+        lck <- asks envGitMutex
+        liftIO . withMVar lck . const $ f
+
+    {-# INLINE getGit  #-}
+    {-# INLINE liftGit #-}
 
 remoteHelperError :: CallStack -> a -> RemoteHelperError a
 remoteHelperError cs e = RemoteHelperError
@@ -172,23 +183,42 @@ liftEitherRH :: (Monad m, HasCallStack) => Either e a -> RemoteHelperT e m a
 liftEitherRH =
     liftEither . first (remoteHelperError (freezeCallStack callStack))
 
+concurrently
+    :: (Show e, Typeable e, DisplayError e)
+    => RemoteHelperT e IO a
+    -> RemoteHelperT e IO b
+    -> RemoteHelperT e IO (a, b)
+concurrently left right = do
+    env <- ask
+    liftIO $ Async.concurrently
+        (either throwM pure =<< runRemoteHelperT env left)
+        (either throwM pure =<< runRemoteHelperT env right)
+
+concurrently_
+    :: (Show e, Typeable e, DisplayError e)
+    => RemoteHelperT e IO a
+    -> RemoteHelperT e IO b
+    -> RemoteHelperT e IO ()
+concurrently_ left right = do
+    env <- ask
+    liftIO $ Async.concurrently_
+        (either throwM pure =<< runRemoteHelperT env left)
+        (either throwM pure =<< runRemoteHelperT env right)
+
 forConcurrently_
     :: ( Foldable     t
        , Show         e
        , Typeable     e
        , DisplayError e
        )
-    => Int                         -- ^ Max concurrency
-    -> t a
+    => t a
     -> (a -> RemoteHelperT e IO b)
     -> RemoteHelperT e IO ()
-forConcurrently_ maxconc xs f = do
+forConcurrently_ xs f = do
     env <- ask
-    liftIO $ do
-        sem <- newQSem (max 1 maxconc)
+    liftIO $
         Async.forConcurrently_ xs $ \x ->
-            bracket_ (waitQSem sem) (signalQSem sem) $
-                either throwM pure =<< runRemoteHelperT env (f x)
+            either throwM pure =<< runRemoteHelperT env (f x)
 
 forConcurrently
     :: ( Traversable  t
@@ -196,17 +226,14 @@ forConcurrently
        , Typeable     e
        , DisplayError e
        )
-    => Int                         -- ^ Max concurrency
-    -> t a
+    => t a
     -> (a -> RemoteHelperT e IO b)
     -> RemoteHelperT e IO (t b)
-forConcurrently maxconc xs f = do
+forConcurrently xs f = do
     env <- ask
-    liftIO $ do
-        sem <- newQSem (max 1 maxconc)
+    liftIO $
         Async.forConcurrently xs $ \x ->
-            bracket_ (waitQSem sem) (signalQSem sem) $
-                either throwM pure =<< runRemoteHelperT env (f x)
+            either throwM pure =<< runRemoteHelperT env (f x)
 
 logInfo :: (HasCallStack, MonadIO m) => Text -> RemoteHelperT e m ()
 logInfo msg = do
@@ -248,12 +275,13 @@ newEnv envLogger envOptions envIpfsOptions = do
     envVerbosity <- newIORef 1
     envDryRun    <- newIORef False
     envGit       <- findRepo >>= openRepo
+    envGitMutex  <- newMVar ()
     envLobs      <- newMVar Nothing
     envClient    <-
         flip mkClientEnv (ipfsApiUrl envIpfsOptions)
             <$> newManager defaultManagerSettings
                     { managerResponseTimeout = responseTimeoutNone }
-
+    envClientSem <- newQSem $ ipfsMaxConns envIpfsOptions
     envIpfsRoot  <-
         case remoteUrlIpfsPath (optRemoteUrl envOptions) of
             IpfsPathIpfs cid  -> pure cid
