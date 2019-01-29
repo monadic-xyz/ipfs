@@ -264,7 +264,7 @@ processFetch sha = do
         have <- git $ \repo -> Git.getObject repo ref True
         case have of
             Just  _ ->
-                logInfo $
+                logDebug $
                     fmt ("fetch: Skipping " % fref % " (" % fcid % ")") ref cid
             Nothing -> do
                 obj  <- ipfs $ do

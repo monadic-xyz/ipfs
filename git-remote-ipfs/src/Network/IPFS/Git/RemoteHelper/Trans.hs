@@ -235,12 +235,12 @@ forConcurrently xs f = do
         Async.forConcurrently xs $ \x ->
             either throwM pure =<< runRemoteHelperT env (f x)
 
-logInfo :: (HasCallStack, MonadIO m) => Text -> RemoteHelperT e m ()
+logInfo :: MonadIO m => Text -> RemoteHelperT e m ()
 logInfo msg = do
     out <- asks $ _logInfo . envLogger
     v   <- liftIO . readIORef =<< asks envVerbosity
     when (v > 0) $
-        liftIO . out $ msg <> renderSourceLoc callStack
+        liftIO $ out msg
 
 logDebug :: (HasCallStack, MonadIO m) => Text -> RemoteHelperT e m ()
 logDebug msg = do

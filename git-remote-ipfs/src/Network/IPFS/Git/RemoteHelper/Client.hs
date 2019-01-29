@@ -264,8 +264,9 @@ updateRemoteUrl root = do
         IpfsPathIpfs _    -> viaConfig (remoteUrlScheme url) root
   where
     viaIpns name = do
-        logInfo "Updating IPNS"
         let ipnsTarget = "/ipfs/" <> cidToText root
+        logInfo $
+            fmt ("Updating IPNS link " % ftxt % " to " % txt) name ipfsTarget
         res <-
             ipfsNamePublish ipnsTarget
                             (Just True)       -- resolve
@@ -279,10 +280,10 @@ updateRemoteUrl root = do
             Just True -> pure ()
             _         -> throwRH $
                 InvalidResponse
-                    (sformat ( "ipfsNamePublish: expected name "
-                             % "`" % stext % "` "
-                             % "pointing to `" % stext % "`"
-                             ) name ipnsTarget)
+                    (fmt ( "ipfsNamePublish: expected name "
+                         % "`" % txt % "` "
+                         % "pointing to `" % txt % "`"
+                         ) name ipnsTarget)
                     res
 
     viaConfig scheme cid = do
@@ -291,7 +292,8 @@ updateRemoteUrl root = do
             configKey = "remote." <> remoteName <> ".url"
             remoteUrl = scheme <> "://ipfs/" <> cidToText cid
          in do
-            logInfo $ "Updating " <> configKey
+            logInfo $
+                fmt ("Updating " % ftxt % " to " % ftxt) configKey remoteUrl
             runProcess_ . shell . Text.unpack $
                 "git config " <> configKey <> " " <> remoteUrl
 
