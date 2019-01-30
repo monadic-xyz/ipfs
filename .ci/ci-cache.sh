@@ -1,31 +1,26 @@
 #!/usr/bin/env bash
 
-set -euo pipefail
+set -euox pipefail
+
+CACHE_BUCKET="gs://multihash-build-cache"
 
 function load-cache() {
-  bucket="gs://multihash-build-cache"
-  key="stack-work-$(sha256sum < stack.yaml | cut -d ' ' -f 1)".tar.gz
-  gsutil -m cp -r "$bucket/v1/*" "$bucket/$key" . || true
-  for f in stack.tar.gz "$key"; do
-    if [[ -e $f ]]; then
-      tar xzf "$f"
-    fi
-  done
+  gsutil -m cp "$CACHE_BUCKET/dot-cabal.tar.gz" . || true
+  if [[ -f dot-cabal.tar.gz ]]; then
+    tar -xzf dot-cabal.tar.gz -C $HOME
+  fi
 }
 
 function save-cache() {
-  bucket="gs://multihash-build-cache"
-  key="stack-work-$(sha256sum < stack.yaml | cut -d ' ' -f 1)".tar.gz
-  if ! gsutil ls "$bucket/$key"; then
-    tar czf "$key" .stack-work
-    gsutil -m cp "$key" "$bucket/$key" || true
-  fi
+  tar -czf dot-cabal.tar.gz -C $HOME \
+    --exclude=".cabal/bin/git-remote-ipfs" \
+    --exclude=".cabal/packages/hackage.haskell.org/build-reports.log" \
+    --exclude=".cabal/packages/hackage.haskell.org/00-index*" \
+    --exclude=".cabal/packages/hackage.haskell.org/01-index*" \
+    --exclude=".cabal/packages/hackage.haskell.org/*.json" \
+    --exclude=".cabal/packages/hackage.haskell.org/hackage-security-lock" \
+    --exclude=".cabal/logs" \
+    .cabal
 
-  rm -rf .stack/indices/Hackage/00-index.tar*
-  tar czf stack.tar.gz .stack
-
-  if ! sha256sum --check stack.tar.gz.sha256; then
-    sha256sum stack.tar.gz > stack.tar.gz.sha256
-    gsutil -m cp stack.tar.gz* "$bucket/v1/" || true
-  fi
+  gsutil -m cp dot-cabal.tar.gz "$CACHE_BUCKET/"
 }

@@ -45,12 +45,13 @@ import           Test.Tasty.HUnit
 type Step = String -> IO ()
 
 main :: IO ()
-main = withSystemTempDirectory "git-remote-ipfs-e2e" $ \tmp -> defaultMain $
-    testGroup "E2E Tests"
-        [ testCaseSteps "Push, clone: IPFS"     $ testPushCloneSimple tmp
-        , testCaseSteps "Push, clone: IPNS"     $ testPushCloneIPNS   tmp
-        , testCaseSteps "Push, clone: LOB IPFS" $ testLargeObjects    tmp
-        ]
+main =
+    withSystemTempDirectory "git-remote-ipfs-e2e" $ \tmp -> defaultMain $
+        testGroup "E2E Tests"
+            [ testCaseSteps "Push, clone: IPFS"     $ testPushCloneSimple tmp
+            , testCaseSteps "Push, clone: IPNS"     $ testPushCloneIPNS   tmp
+            , testCaseSteps "Push, clone: LOB IPFS" $ testLargeObjects    tmp
+            ]
 
 testPushCloneSimple :: FilePath -> Step -> IO ()
 testPushCloneSimple root step = runPushCloneTest PushCloneOpts

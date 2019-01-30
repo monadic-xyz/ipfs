@@ -1,5 +1,12 @@
 A collection of Haskell libraries for interacting with IPFS_
 
+................................................................................
+
+.. image:: https://travis-ci.org/oscoin/ipfs.svg?branch=master
+   :target: https://travis-ci.org/oscoin/ipfs
+
+................................................................................
+
 .. contents::
    :local:
    :backlinks: none
@@ -44,8 +51,12 @@ Multiformats_ and related packages:
 Building
 ================================================================================
 
-We maintain both a cabal_ and a stack_ build. Please see the package READMEs for
-additional instructions, specifically test setups.
+The canonical build for this project is using cabal_ (>= 2.4, "new-build). For
+convencience, we also provide a ``stack.yaml``. stack_ >= 1.9.1 is required to
+meet the version requirements for ``Cabal``.
+
+Please see the package READMEs for additional instructions, specifically test
+setups.
 
 Contributing
 ================================================================================

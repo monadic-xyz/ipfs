@@ -1,0 +1,46 @@
+language: c
+
+dist: xenial
+
+matrix:
+  include:
+    - env: GHCVER=8.6.3 CABALVER=2.4.1.0
+      os: linux
+      sudo: required
+    - env: GHCVER=8.4.4 CABALVER=2.4.1.0
+      os: linux
+      sudo: required
+
+    - env: GHCVER=8.6.3 CABALVER=2.4.1.0
+      os: osx
+
+addons:
+  apt:
+    packages:
+      - libnuma-dev
+
+before_install:
+  - .ci/travis-install.sh
+  - export PATH="$HOME/.cabal/bin:$HOME/.ghcup/bin:$PATH"
+
+install:
+  - cabal v2-update
+
+script:
+  - cabal v2-configure --enable-tests
+  - cabal v2-build -j all
+  - cabal v2-test -j all
+
+cache:
+  directories:
+    - $HOME/.cabal/packages
+    - $HOME/.cabal/store
+    - $HOME/.cabal/bin
+    - $HOME/.ghcup
+
+before_cache:
+  - rm -fv $HOME/.cabal/packages/hackage.haskell.org/build-reports.log
+  - rm -fv $HOME/.cabal/packages/hackage.haskell.org/00-index*
+  - rm -fv $HOME/.cabal/packages/hackage.haskell.org/01-index*
+  - rm -fv $HOME/.cabal/packages/hackage.haskell.org/*.json
+  - rm -fv $HOME/.cabal/packages/hackage.haskell.org/hackage-security-lock

@@ -9,20 +9,28 @@ steps:
       source .ci/ci-cache.sh
       load-cache
 
-  - id: "Build deps"
+  - id: "Build dependencies"
     waitFor:
     - "Load cache"
-    name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
-    env:
-    - STACK_ROOT=/workspace/.stack
+    name: "haskell:8.6.3"
     entrypoint: bash
-    dir: "/tmp"
     args:
     - "-c"
     - |
-      stack config set system-ghc --global true
-      stack config set install-ghc --global false
-      stack install stylish-haskell hlint weeder
+      cabal v2-update
+      cabal v2-install -j stylish-haskell hlint
+      cabal v2-build -j --enable-tests -fwith-e2e-tests --only-dependencies all
+
+  - id: "Save cache"
+    waitFor:
+    - "Build dependencies"
+    name: gcr.io/cloud-builders/gsutil
+    entrypoint: bash
+    args:
+    - "-c"
+    - |
+      source .ci/ci-cache.sh
+      save-cache
 
   - id: "Start IPFS daemon"
     waitFor:
@@ -38,44 +46,37 @@ steps:
 
   - id: "Format (haskell)"
     waitFor:
-    - "Build deps"
-    name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
+    - "Save cache"
+    name: "haskell:8.6.3"
     args:
     - "./.ci/check-haskell-format.sh"
 
   - id: "Lint (hlint)"
     waitFor:
-    - "Build deps"
-    name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
+    - "Save cache"
+    name: "haskell:8.6.3"
     args:
-    - "/builder/home/.local/bin/hlint"
+    - "/builder/home/.cabal/bin/hlint"
     - "."
 
   - id: "Build and Test"
     waitFor:
-    - "Build deps"
-    name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
-    env:
-    - STACK_ROOT=/workspace/.stack
-    - "IPFS_API_URL=http://ipfs-test-network:5001"
-    args:
-    - "./.ci/build-and-test.sh"
-
-  - id: "Lint (weeder)"
-    waitFor:
-    - "Build and Test"
-    name: "eu.gcr.io/opensourcecoin/haskell:8.4.4"
-    env:
-    - STACK_ROOT=/workspace/.stack
-    args:
-    - "/builder/home/.local/bin/weeder"
-    - "."
-
-  - id: "Save cache"
-    name: gcr.io/cloud-builders/gsutil
+    - "Save cache"
+    name: "haskell:8.6.3"
     entrypoint: bash
     args:
     - "-c"
     - |
-      source .ci/ci-cache.sh
-      save-cache
+      cabal v2-configure --enable-tests
+      cabal v2-build -j all
+      cabal v2-test -j all
+
+  - id: "E2E Tests"
+    waitFor:
+    - "Save cache"
+    - "Start IPFS daemon"
+    name: "haskell:8.6.3"
+    env:
+    - "IPFS_API_URL=http://ipfs-test-network:5001"
+    args:
+    - "./.ci/e2e.sh"
