@@ -73,7 +73,7 @@ library
       , filepath
       , formatting
       , generics-sop
-      , git
+      , git >= 0.3.0
       , http-client
       , ipfs-api
       , ipld-cid
@@ -128,20 +128,17 @@ test-suite e2e-tests
       , bytestring
       , entropy
       , filepath
-      , gitlib
-      , gitlib-libgit2
+      , git >= 0.3.0
+      , hourglass
       , http-client
       , ipfs-api
       , lens
       , lens-aeson
-      , mtl
       , safe-exceptions
       , servant
       , servant-client >= 0.15
-      , tagged
       , tasty
       , tasty-hunit
       , temporary
       , text
-      , time
       , typed-process
