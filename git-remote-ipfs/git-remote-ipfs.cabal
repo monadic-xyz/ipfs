@@ -73,7 +73,7 @@ library
       , filepath
       , formatting
       , generics-sop
-      , git
+      , git >= 0.3.0
       , http-client
       , ipfs-api
       , ipld-cid
@@ -128,7 +128,7 @@ test-suite e2e-tests
       , bytestring
       , entropy
       , filepath
-      , git
+      , git >= 0.3.0
       , hourglass
       , http-client
       , ipfs-api
