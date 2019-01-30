@@ -128,20 +128,17 @@ test-suite e2e-tests
       , bytestring
       , entropy
       , filepath
-      , gitlib
-      , gitlib-libgit2
+      , git
+      , hourglass
       , http-client
       , ipfs-api
       , lens
       , lens-aeson
-      , mtl
       , safe-exceptions
       , servant
       , servant-client >= 0.15
-      , tagged
       , tasty
       , tasty-hunit
       , temporary
       , text
-      , time
       , typed-process

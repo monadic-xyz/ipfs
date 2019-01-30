@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE ViewPatterns      #-}
 
 {-# OPTIONS_GHC -fno-warn-missing-signatures #-}
 
@@ -8,23 +9,24 @@ module Main where
 import           Control.Applicative (liftA2)
 import           Control.Exception.Safe (throwM, throwString)
 import           Control.Lens (firstOf)
-import           Control.Monad.Except
-import           Control.Monad.Reader
+import           Control.Monad (void)
 import           Data.Aeson.Lens (key, _String)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString.Char8 as Bytes
-import           Data.ByteString.Lazy (toStrict)
+import           Data.ByteString.Lazy (fromStrict, toStrict)
+import qualified Data.ByteString.Lazy.Char8 as Lazy
 import           Data.Foldable (foldlM)
-import           Data.Maybe (fromMaybe, maybeToList)
+import qualified Data.Git.Monad as Git
+import           Data.Git.Ref (SHA1)
+import qualified Data.Git.Storage as Git (initRepo)
+import           Data.Git.Types (GitTime(..))
+import           Data.Maybe (fromMaybe)
 import           Data.Proxy (Proxy(..))
-import           Data.Tagged (untag)
+import           Data.String (fromString)
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import           Data.Text.Encoding (decodeUtf8)
-import           Data.Time (ZonedTime, getZonedTime)
 import           GHC.Stack (HasCallStack)
-import           Git
-import           Git.Libgit2 (LgRepo, lgFactory)
 import qualified Network.HTTP.Client as Http
 import           Network.IPFS.API (ApiV0KeyGen, ApiV0NamePublish)
 import           Servant.API
@@ -33,6 +35,7 @@ import           System.Entropy (getEntropy)
 import           System.Environment (lookupEnv)
 import           System.Exit (ExitCode(..))
 import           System.FilePath (takeBaseName, takeDirectory, (</>))
+import           System.Hourglass (timeCurrent, timezoneCurrent)
 import           System.IO.Temp (withSystemTempDirectory)
 import           System.Process.Typed
 
@@ -86,23 +89,27 @@ data PushCloneOpts = PushCloneOpts
     { pcoRepo      :: FilePath
     , pcoClone     :: FilePath
     , pcoRemoteUrl :: String
-    , pcoHistory   :: ReaderT LgRepo IO (Commit LgRepo)
+    , pcoHistory   :: FilePath -> IO ()
     , pcoLog       :: Step
     }
 
 runPushCloneTest :: PushCloneOpts -> IO ()
 runPushCloneTest PushCloneOpts{..} = do
     initRepo pcoLog pcoRepo pcoHistory
+
     url <- pushIpfs pcoLog pcoRepo pcoRemoteUrl
     cloneIpfs pcoLog (takeDirectory pcoClone) url
+
     assertSameRepos pcoLog pcoRepo pcoClone
 
-initRepo :: Step -> FilePath -> ReaderT LgRepo IO (Commit LgRepo) -> IO ()
-initRepo step path history = do
-    step $ "Initializing repo at " <> path
-    withRepository' lgFactory (mkROpts path True) $
-        history >>=
-            updateReference "refs/heads/master" . RefObj . untag . commitOid
+initRepo :: HasCallStack => Step -> FilePath -> (FilePath -> IO ()) -> IO ()
+initRepo step repo history = do
+    step $ "Initializing repo at " <> repo
+    let repo' = fromString repo
+    Git.initRepo repo'
+    (>>= either throwString pure) . Git.withRepo repo' $
+        Git.headSet $ pure "master"
+    history repo
 
 pushIpfs :: Step -> FilePath -> String -> IO String
 pushIpfs step repo url = do
@@ -126,45 +133,44 @@ assertSameRepos step src clone = do
     void $ gitAssert "Source and cloned repository differ"
         clone ["diff", "--quiet", "origin/master", "src/master"]
 
-simpleHistory :: ReaderT LgRepo IO (Commit LgRepo)
-simpleHistory =
-    maybe (throwString "headless history") pure =<<
-        foldlM (\parent -> fmap Just . mkCommit parent) Nothing ['a'..'z']
+simpleHistory :: FilePath -> IO ()
+simpleHistory repo =
+    (>>= either throwString (const $ pure ())) . Git.withRepo (fromString repo) $ do
+        initial <- mkCommit Nothing Nothing 0
+        foldlM (\(bs, rev) i -> mkCommit bs rev i) initial [1..42]
   where
-    mkCommit parent c = do
-        blob <- createBlobUtf8 $ "Blob " <> Text.singleton c
-        tree <-
-            maybe createTree (mutateTreeOid . commitTree) parent $
-                putBlob ("blobs/" <> Bytes.singleton c) blob
-        sig' <- mkSig <$> liftIO getZonedTime
-        createCommit (maybeToList . fmap commitOid $ parent)
-                     tree
-                     sig'
-                     sig'
-                     ("Commit " <> Text.singleton c)
-                     (Just "HEAD")
+    mkCommit
+        :: Maybe Lazy.ByteString
+        -> Maybe String
+        -> Int
+        -> Git.GitM (Maybe Lazy.ByteString, Maybe String)
+    mkCommit readme branch (show -> i) = do
+        person  <- mkPerson <$> currentTimeGit
+        (r, ()) <-
+            Git.withNewCommit person branch $ do
+                Git.setMessage $ "Commit " <> Bytes.pack i
+                Git.setFile ["README"] $
+                    fromMaybe mempty readme <> Lazy.pack i <> "\n"
+        Git.branchWrite "master" r
+        (,Just "master") <$>
+            Git.withCommit ("master" :: String) (Git.getFile ["README"])
 
-lobHistory :: ReaderT LgRepo IO (Commit LgRepo)
-lobHistory = do
-    blob <- createBlob . BlobString =<< liftIO (getEntropy 4096000)
-    tree <- createTree $ putBlob "binarylargeobject" blob
-    sig' <- mkSig <$> liftIO getZonedTime
-    createCommit [] tree sig' sig' "A large bunch of bytes" (Just "HEAD")
+lobHistory :: FilePath -> IO ()
+lobHistory repo = do
+    blob <- getEntropy 4096000
+    (>>= either throwString pure) . Git.withRepo (fromString repo) $ do
+        person  <- mkPerson <$> currentTimeGit
+        (r, ()) <-
+            Git.withNewCommit person (Nothing :: Maybe (Git.Ref SHA1)) $ do
+                Git.setMessage "Huuuuge"
+                Git.setFile ["huge.file"] $ fromStrict blob
+        Git.branchWrite "master" r
 
-mkSig :: ZonedTime -> Signature
-mkSig t = Signature
-    { signatureName  = "LeBoeuf"
-    , signatureEmail = "le@boe.uf"
-    , signatureWhen  = t
-    }
+mkPerson :: GitTime -> Git.Person
+mkPerson = Git.Person "LeBoeuf" "le@boe.uf"
 
-mkROpts :: FilePath -> Bool -> RepositoryOptions
-mkROpts p autoCreate = RepositoryOptions
-    { repoPath       = p
-    , repoWorkingDir = Nothing
-    , repoIsBare     = False
-    , repoAutoCreate = autoCreate
-    }
+currentTimeGit :: Git.GitM GitTime
+currentTimeGit = Git.liftGit $ liftA2 GitTime timeCurrent timezoneCurrent
 
 git :: FilePath -> [String] -> IO ByteString
 git = gitAssert mempty
@@ -173,19 +179,17 @@ git_ :: FilePath -> [String] -> IO ()
 git_ repo args = void $ git repo args
 
 gitAssert :: String -> FilePath -> [String] -> IO ByteString
-gitAssert msg repo args =
-    let
-        cfg = proc "git" ("--git-dir" : repo : args)
-     in
-        readProcess cfg >>= \case
-            (ExitSuccess, out, _err) -> pure $ toStrict out
-            (failure    , out, err ) -> assertFailure $ unlines
-                [ msg
-                , show failure
-                , show cfg
-                , show out
-                , show err
-                ]
+gitAssert msg repo args = do
+    let cfg = proc "git" $ "--git-dir" : repo : args
+    readProcess cfg >>= \case
+        (ExitSuccess, out, _err) -> pure $ toStrict out
+        (failure    , out, err ) -> assertFailure $ unlines
+            [ msg
+            , show failure
+            , show cfg
+            , show out
+            , show err
+            ]
 
 type IPFS = ApiV0KeyGen :<|> ApiV0NamePublish
 
