@@ -48,7 +48,6 @@ import qualified Data.Text as Text
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as LT (decodeUtf8)
 import           Data.Traversable (for)
-import           Formatting (sformat, stext, (%))
 import           System.FilePath (joinPath)
 import           System.Process.Typed (runProcess_, shell)
 
@@ -266,7 +265,7 @@ updateRemoteUrl root = do
     viaIpns name = do
         let ipnsTarget = "/ipfs/" <> cidToText root
         logInfo $
-            fmt ("Updating IPNS link " % ftxt % " to " % txt) name ipfsTarget
+            fmt ("Updating IPNS link " % ftxt % " to " % ftxt) name ipnsTarget
         res <-
             ipfsNamePublish ipnsTarget
                             (Just True)       -- resolve
@@ -281,8 +280,8 @@ updateRemoteUrl root = do
             _         -> throwRH $
                 InvalidResponse
                     (fmt ( "ipfsNamePublish: expected name "
-                         % "`" % txt % "` "
-                         % "pointing to `" % txt % "`"
+                         % "`" % ftxt % "` "
+                         % "pointing to `" % ftxt % "`"
                          ) name ipnsTarget)
                     res
 
