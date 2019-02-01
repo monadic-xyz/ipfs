@@ -1,4 +1,4 @@
 packages: */*.cabal
 
 constraints:
-    sandi -f-with-conduit
+    sandi -with-conduit

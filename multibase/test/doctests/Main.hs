@@ -1,9 +1,7 @@
-module Main (main) where
+module Main where
 
-import           System.FilePath.Glob (glob)
-import           Test.DocTest
+import           Build_doctests (flags, module_sources, pkgs)
+import           Test.DocTest (doctest)
 
 main :: IO ()
-main = do
-    srcs <- glob "src/**/*.hs"
-    doctest srcs
+main = doctest $ flags <> pkgs <> module_sources
