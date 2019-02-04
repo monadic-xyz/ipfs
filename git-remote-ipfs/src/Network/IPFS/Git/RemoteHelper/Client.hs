@@ -29,7 +29,6 @@ module Network.IPFS.Git.RemoteHelper.Client
 where
 
 import           Control.Applicative (liftA2)
-import           Control.Concurrent.QSem (signalQSem, waitQSem)
 import           Control.Exception.Safe
 import qualified Control.Lens as Lens
 import           Control.Monad.Except
@@ -48,7 +47,6 @@ import qualified Data.Text as Text
 import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as LT (decodeUtf8)
 import           Data.Traversable (for)
-import           Formatting (sformat, stext, (%))
 import           System.FilePath (joinPath)
 import           System.Process.Typed (runProcess_, shell)
 
@@ -264,8 +262,9 @@ updateRemoteUrl root = do
         IpfsPathIpfs _    -> viaConfig (remoteUrlScheme url) root
   where
     viaIpns name = do
-        logInfo "Updating IPNS"
         let ipnsTarget = "/ipfs/" <> cidToText root
+        logInfo $
+            fmt ("Updating IPNS link " % ftxt % " to " % ftxt) name ipnsTarget
         res <-
             ipfsNamePublish ipnsTarget
                             (Just True)       -- resolve
@@ -279,10 +278,10 @@ updateRemoteUrl root = do
             Just True -> pure ()
             _         -> throwRH $
                 InvalidResponse
-                    (sformat ( "ipfsNamePublish: expected name "
-                             % "`" % stext % "` "
-                             % "pointing to `" % stext % "`"
-                             ) name ipnsTarget)
+                    (fmt ( "ipfsNamePublish: expected name "
+                         % "`" % ftxt % "` "
+                         % "pointing to `" % ftxt % "`"
+                         ) name ipnsTarget)
                     res
 
     viaConfig scheme cid = do
@@ -291,7 +290,8 @@ updateRemoteUrl root = do
             configKey = "remote." <> remoteName <> ".url"
             remoteUrl = scheme <> "://ipfs/" <> cidToText cid
          in do
-            logInfo $ "Updating " <> configKey
+            logInfo $
+                fmt ("Updating " % ftxt % " to " % ftxt) configKey remoteUrl
             runProcess_ . shell . Text.unpack $
                 "git config " <> configKey <> " " <> remoteUrl
 
@@ -356,12 +356,7 @@ ipfsAdd
 
     nat m = do
         env <- asks envClient
-        sem <- asks envClientSem
-        res <-
-            liftIO
-                . bracket_ (waitQSem sem) (signalQSem sem)
-                $ Servant.runClientM m env
-        either (throwRH . ApiError) pure res
+        either (throwRH . ApiError) pure =<< liftIO (Servant.runClientM m env)
 
     api = Proxy @IPFS
 
@@ -376,17 +371,15 @@ stream
     -> RemoteHelperT ClientError m L.ByteString
 stream m = do
     env <- asks envClient
-    sem <- asks envClientSem
-    liftIO (go env sem) `catches` handlers
+    liftIO (go env) `catches` handlers
   where
     handlers =
         [ Handler $ throwRH . ApiError
         , Handler $ \(StringException e _) -> throwRH $ StreamingError e
         ]
 
-    go env sem =
-        bracket_ (waitQSem sem) (signalQSem sem) $
-        ServantS.withClientM m env               $ \case
+    go env =
+        ServantS.withClientM m env $ \case
             Left  e -> throwM e
             Right s -> runExceptT (runSourceT s) >>= \case
                 Left  e'  -> throwString e'

@@ -65,10 +65,11 @@ library
 
     build-depends:
         aeson
-      , async
+      , async >= 2.1.1
       , attoparsec
       , base >= 4.9 && < 5
       , bytestring
+      , conduit >= 1.3
       , cryptonite
       , filepath
       , formatting
@@ -84,9 +85,11 @@ library
       , multihash-cryptonite
       , network-uri
       , optparse-applicative
+      , primitive
       , safe-exceptions
       , servant
       , servant-client >= 0.15
+      , stm >= 2.5
       , text
       , transformers
       , typed-process
