@@ -1,5 +1,6 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
+{-# LANGUAGE TypeFamilies               #-}
 
 module Network.IPFS.Git.RemoteHelper.Trans
     ( Logger (..)
@@ -13,7 +14,6 @@ module Network.IPFS.Git.RemoteHelper.Trans
     , envIpfsOptions
     , envGit
     , envClient
-    , envClientSem
     , envIpfsRoot
     , envLobs
 
@@ -47,10 +47,10 @@ where
 
 import qualified Control.Concurrent.Async as Async
 import           Control.Concurrent.MVar (MVar, newMVar, withMVar)
-import           Control.Concurrent.QSem
 import           Control.Exception.Safe
 import qualified Control.Lens as Lens
 import           Control.Monad.Except
+import           Control.Monad.Primitive
 import           Control.Monad.Reader
 import qualified Data.Aeson.Lens as Lens
 import           Data.Bifunctor (first)
@@ -107,7 +107,6 @@ data Env = Env
     , envGit         :: Git SHA1
     , envGitMutex    :: MVar ()
     , envClient      :: Servant.ClientEnv
-    , envClientSem   :: QSem
     , envIpfsRoot    :: CID
     , envLobs        :: MVar (Maybe (HashMap CID CID))
     }
@@ -144,6 +143,15 @@ newtype RemoteHelperT e m a = RemoteHelperT
                , MonadCatch
                , MonadMask
                )
+
+instance MonadTrans (RemoteHelperT e) where
+    lift = RemoteHelperT . lift . lift
+    {-# INLINE lift #-}
+
+instance PrimMonad m => PrimMonad (RemoteHelperT e m) where
+    type PrimState (RemoteHelperT e m) = PrimState m
+    primitive = lift . primitive
+    {-# INLINE primitive #-}
 
 instance MonadIO m => GitMonad (RemoteHelperT e m) where
     getGit    = asks envGit
@@ -281,7 +289,6 @@ newEnv envLogger envOptions envIpfsOptions = do
         flip mkClientEnv (ipfsApiUrl envIpfsOptions)
             <$> newManager defaultManagerSettings
                     { managerResponseTimeout = responseTimeoutNone }
-    envClientSem <- newQSem $ ipfsMaxConns envIpfsOptions
     envIpfsRoot  <-
         case remoteUrlIpfsPath (optRemoteUrl envOptions) of
             IpfsPathIpfs cid  -> pure cid

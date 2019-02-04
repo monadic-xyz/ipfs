@@ -1,6 +1,7 @@
-{-# LANGUAGE FlexibleContexts  #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TypeOperators     #-}
+{-# LANGUAGE FlexibleContexts    #-}
+{-# LANGUAGE OverloadedStrings   #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators       #-}
 
 module Network.IPFS.Git.RemoteHelper
     ( ProcessError
@@ -21,20 +22,27 @@ import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Data.Bifunctor (first)
 import qualified Data.ByteString.Lazy as L
-import           Data.Foldable (toList)
+import           Data.Foldable (toList, traverse_)
+import           Data.HashMap.Strict (HashMap)
 import           Data.IORef (atomicModifyIORef')
-import           Data.Maybe (catMaybes)
+import           Data.Maybe (catMaybes, isNothing)
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Read as Text
 import           Data.Traversable (for)
+import           Data.Vector (Vector)
+import qualified Data.Vector as Vector
 import           GHC.Stack (HasCallStack)
 import           System.FilePath (joinPath, splitDirectories)
+
+import           Data.Conduit
+import qualified Data.Conduit.Combinators as Conduit
 
 import           Data.IPLD.CID (CID, cidFromText, cidToText)
 
 import qualified Data.Git.Monad as Git (getGit, liftGit)
-import qualified Data.Git.Ref as Git (Ref, SHA1)
+import           Data.Git.Ref (SHA1)
+import qualified Data.Git.Ref as Git (Ref)
 import qualified Data.Git.Repository as Git (branchList, resolveRevision)
 import qualified Data.Git.Revision as Git (Revision(..))
 import qualified Data.Git.Storage as Git (Git, getObject, getObject_, setObject)
@@ -66,7 +74,7 @@ data ProcessError
 -- The data constructors take the expected value first, then the actual.
 data HashMismatch
     = CidMismatch CID CID
-    | RefMismatch (Git.Ref Git.SHA1) (Git.Ref Git.SHA1)
+    | RefMismatch (Git.Ref SHA1) (Git.Ref SHA1)
     deriving Show
 
 instance DisplayError ProcessError where
@@ -182,7 +190,12 @@ processPush _ localRef remoteRef = do
         refCid <- ipfs $ resolvePath (cidToText root <> "/" <> remoteRef)
         pure $ refCid >>= hush . cidFromText
 
-    unless (Just localRefCid == remoteRefCid) $ go root localRefCid
+    maxConc <- asks $ ipfsMaxConns . envIpfsOptions
+    runConduit $
+           readObject remoteRefCid localRefCid
+        .| Conduit.conduitVector maxConc
+        .| Conduit.mapM_ (\(batch :: Vector (CID, Git.Object SHA1)) ->
+            forConcurrently_ batch $ pushObject root)
 
     ipfs $ do
         -- Update the root to point to the local ref, up to which we just pushed
@@ -194,20 +207,26 @@ processPush _ localRef remoteRef = do
             -- HEAD is our new root, update the remote.url and pin
             hEAD <$ concurrently_ (updateRemoteUrl hEAD) (pin hEAD)
   where
-    go !root localRefCid = do
-        logDebug $ fmt ("processPush: " % fcid % " " % fcid) root localRefCid
-        obj <- do
-            sha <-
-                liftEitherRH . first CidError $
-                    cidToRef @Git.SHA1 localRefCid
-            logDebug $ "sha " <> Text.pack (show sha)
-            git $ \repo -> Git.getObject_ repo sha True
+    readObject
+        :: Maybe CID
+        -> CID
+        -> ConduitT () (CID, Git.Object SHA1) (RemoteHelper ProcessError) ()
+    readObject remoteCid cid | remoteCid == Just cid = pure ()
+                               | otherwise             = do
+        obj <-
+            lift $ do
+                sha <- liftEitherRH . first CidError $ cidToRef @SHA1 cid
+                git $ \repo -> Git.getObject_ repo sha True
+        yield (cid, obj)
+        traverse_ (readObject remoteCid) $ objectLinks obj
 
+    pushObject root (cid, obj) = do
         let raw = Git.looseMarshall obj
 
+        logDebug $ fmt ("Pushing " % fcid) cid
         blkCid <- ipfs $ putBlock raw
-        when (localRefCid /= blkCid) $
-            throwRH $ HashError (CidMismatch localRefCid blkCid)
+        when (cid /= blkCid) $
+            throwRH $ HashError (CidMismatch cid blkCid)
 
         -- If the object exceeds the maximum block size, bitswap won't replicate
         -- the block. To work around this, we create a regular object and link
@@ -226,9 +245,6 @@ processPush _ localRef remoteRef = do
                     Git.ObjBlob blob -> pushLargeBlob blob root linkName
                     _                -> linkedObject  raw  root linkName
 
-        -- process links
-        forConcurrently_ (objectLinks obj) $ go root
-
     pushLargeBlob blob root linkName =
         let
             hdr = L.fromStrict $ Git.objectWriteHeader Git.TypeBlob len
@@ -244,39 +260,57 @@ processPush _ localRef remoteRef = do
 
 processFetch :: HasCallStack => Text -> RemoteHelper ProcessError ()
 processFetch sha = do
-    root <- asks envIpfsRoot
     cid  <- liftEitherRH . first CidError $ cidFromHexShaText sha
-    lobs <- do
+    lobs <- loadLobs
+
+    runConduit $
+           fetchObjects lobs (Vector.singleton cid)
+        .| Conduit.mapM_ storeObject
+
+    void $ asks envIpfsRoot >>= ipfs . pin
+  where
+    fetchObjects
+        :: HashMap CID CID
+        -> Vector CID
+        -> ConduitT () (Git.Ref SHA1, Git.Object SHA1) (RemoteHelper ProcessError) ()
+    fetchObjects !lobs cids = do
+        todo <- lift $ do
+            xs <-
+                for cids $ \cid -> do
+                    ref <- liftEitherRH . first CidError $ cidToRef @SHA1 cid
+                    pure (ref, cid)
+            Vector.filterM (fmap isNothing . lookupObject . fst) xs
+
+        unless (Vector.null todo) $ do
+            objs <- lift $ do
+                logDebug $ fmt ("Fetching objects: " % shown) todo
+                maxConc <- asks $ ipfsMaxConns . envIpfsOptions
+                fmap join . for (chunksOfV maxConc todo) $ \batch ->
+                    forConcurrently batch (fetchObject lobs . snd)
+            traverse_ yield $
+                Vector.zip (Vector.map fst todo) objs
+            fetchObjects lobs $ foldMap objectLinks objs
+
+    fetchObject lobs cid = ipfs $ do
+        lob <- provideLargeObject lobs cid
+        Git.looseUnmarshall @SHA1 <$> maybe (getBlock cid) pure lob
+
+    storeObject (ref, obj) = do
+        ref' <- git $ flip Git.setObject obj
+        when (ref' /= ref) $
+            throwRH $ HashError (RefMismatch ref ref')
+
+    lookupObject ref = git $ \repo -> Git.getObject repo ref True
+
+    loadLobs = do
         env <- ask
         (>>= either throwError pure)
             . liftIO . modifyMVar (envLobs env) $ \case
                 Just ls -> pure (Just ls, Right ls)
                 Nothing ->
-                    runRemoteHelper env (ipfs (largeObjects root)) >>= \case
+                    runRemoteHelper env (ipfs (largeObjects (envIpfsRoot env))) >>= \case
                         Left  e  -> pure (Nothing, Left  e)
                         Right ls -> pure (Just ls, Right ls)
-
-    go root lobs cid
-    void . ipfs $ pin root
-  where
-    go !root !lobs cid = do
-        ref  <- liftEitherRH . first CidError $ cidToRef @Git.SHA1 cid
-        have <- git $ \repo -> Git.getObject repo ref True
-        case have of
-            Just  _ ->
-                logDebug $
-                    fmt ("fetch: Skipping " % fref % " (" % fcid % ")") ref cid
-            Nothing -> do
-                obj  <- ipfs $ do
-                    lob <- provideLargeObject lobs cid
-                    Git.looseUnmarshall @Git.SHA1
-                        <$> maybe (getBlock cid) pure lob
-
-                ref' <- git $ flip Git.setObject obj
-                when (ref' /= ref) $
-                    throwRH $ HashError (RefMismatch ref ref')
-
-                forConcurrently_ (objectLinks obj) $ go root lobs
 
 --------------------------------------------------------------------------------
 
@@ -288,9 +322,15 @@ ipfs = mapError IPFSError
 -- XXX: hs-git uses 'error' deliberately, should be using 'tryAnyDeep' here.
 -- Requires patch to upstream to get 'NFData' instances everywhere.
 git :: (MonadCatch m, MonadIO m, HasCallStack)
-    => (Git.Git Git.SHA1 -> IO a)
+    => (Git.Git SHA1 -> IO a)
     -> RemoteHelperT ProcessError m a
 git f = do
     repo <- Git.getGit
     res  <- Git.liftGit $ first GitError <$> tryAny (f repo)
     either throwRH pure res
+
+chunksOfV :: Int -> Vector a -> Vector (Vector a)
+chunksOfV n = Vector.unfoldr go
+  where
+    go v | Vector.null v = Nothing
+         | otherwise     = Just $ Vector.splitAt n v

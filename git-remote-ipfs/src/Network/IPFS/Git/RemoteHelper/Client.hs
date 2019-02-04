@@ -29,7 +29,6 @@ module Network.IPFS.Git.RemoteHelper.Client
 where
 
 import           Control.Applicative (liftA2)
-import           Control.Concurrent.QSem (signalQSem, waitQSem)
 import           Control.Exception.Safe
 import qualified Control.Lens as Lens
 import           Control.Monad.Except
@@ -357,12 +356,7 @@ ipfsAdd
 
     nat m = do
         env <- asks envClient
-        sem <- asks envClientSem
-        res <-
-            liftIO
-                . bracket_ (waitQSem sem) (signalQSem sem)
-                $ Servant.runClientM m env
-        either (throwRH . ApiError) pure res
+        either (throwRH . ApiError) pure =<< liftIO (Servant.runClientM m env)
 
     api = Proxy @IPFS
 
@@ -377,17 +371,15 @@ stream
     -> RemoteHelperT ClientError m L.ByteString
 stream m = do
     env <- asks envClient
-    sem <- asks envClientSem
-    liftIO (go env sem) `catches` handlers
+    liftIO (go env) `catches` handlers
   where
     handlers =
         [ Handler $ throwRH . ApiError
         , Handler $ \(StringException e _) -> throwRH $ StreamingError e
         ]
 
-    go env sem =
-        bracket_ (waitQSem sem) (signalQSem sem) $
-        ServantS.withClientM m env               $ \case
+    go env =
+        ServantS.withClientM m env $ \case
             Left  e -> throwM e
             Right s -> runExceptT (runSourceT s) >>= \case
                 Left  e'  -> throwString e'
