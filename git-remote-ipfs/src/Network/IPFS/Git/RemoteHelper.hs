@@ -212,7 +212,7 @@ processPush _ localRef remoteRef = do
         -> CID
         -> ConduitT () (CID, Git.Object SHA1) (RemoteHelper ProcessError) ()
     readObject remoteCid cid | remoteCid == Just cid = pure ()
-                               | otherwise             = do
+                             | otherwise             = do
         obj <-
             lift $ do
                 sha <- liftEitherRH . first CidError $ cidToRef @SHA1 cid
