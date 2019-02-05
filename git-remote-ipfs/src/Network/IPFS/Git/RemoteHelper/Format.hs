@@ -3,6 +3,7 @@ module Network.IPFS.Git.RemoteHelper.Format
     , sfmt
     , fstr
     , ftxt
+    , fint
     , fcid
     , fref
     , frefName
@@ -30,6 +31,9 @@ fstr = string
 
 ftxt :: Format r (Text -> r)
 ftxt = stext
+
+fint :: Integral a => Format r (a -> r)
+fint = int
 
 fcid :: Format r (CID -> r)
 fcid = mapf cidToText stext

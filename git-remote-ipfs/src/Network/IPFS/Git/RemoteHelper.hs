@@ -24,6 +24,7 @@ import           Data.Bifunctor (first)
 import qualified Data.ByteString.Lazy as L
 import           Data.Foldable (toList, traverse_)
 import           Data.HashMap.Strict (HashMap)
+import qualified Data.HashSet as Set
 import           Data.IORef (atomicModifyIORef')
 import           Data.Maybe (catMaybes, isNothing)
 import           Data.Text (Text)
@@ -60,6 +61,7 @@ import           Network.IPFS.Git.RemoteHelper.Format
 import           Network.IPFS.Git.RemoteHelper.Internal
 import           Network.IPFS.Git.RemoteHelper.Options (IpfsOptions'(..))
 import           Network.IPFS.Git.RemoteHelper.Trans
+
 
 data ProcessError
     = GitError        SomeException
@@ -192,10 +194,11 @@ processPush _ localRef remoteRef = do
 
     maxConc <- asks $ ipfsMaxConns . envIpfsOptions
     runConduit $
-           readObject remoteRefCid localRefCid
+           collectObjects (maybe mempty Set.singleton remoteRefCid)
+                          (Vector.singleton localRefCid)
         .| Conduit.conduitVector maxConc
         .| Conduit.mapM_ (\(batch :: Vector (CID, Git.Object SHA1)) ->
-            forConcurrently_ batch $ pushObject root)
+               forConcurrently_ batch $ pushObject root)
 
     ipfs $ do
         -- Update the root to point to the local ref, up to which we just pushed
@@ -207,18 +210,21 @@ processPush _ localRef remoteRef = do
             -- HEAD is our new root, update the remote.url and pin
             hEAD <$ concurrently_ (updateRemoteUrl hEAD) (pin hEAD)
   where
-    readObject
-        :: Maybe CID
-        -> CID
-        -> ConduitT () (CID, Git.Object SHA1) (RemoteHelper ProcessError) ()
-    readObject remoteCid cid | remoteCid == Just cid = pure ()
-                             | otherwise             = do
-        obj <-
-            lift $ do
+    collectObjects _    cids | Vector.null cids = pure ()
+    collectObjects seen cids = do
+        let cid   = Vector.unsafeHead cids
+        let cids' = Vector.unsafeTail cids
+
+        if | Set.member cid seen -> collectObjects seen cids'
+           | otherwise           -> do
+
+            obj <- lift $ do
                 sha <- liftEitherRH . first CidError $ cidToRef @SHA1 cid
                 git $ \repo -> Git.getObject_ repo sha True
-        yield (cid, obj)
-        traverse_ (readObject remoteCid) $ objectLinks obj
+
+            yield (cid, obj)
+
+            collectObjects (Set.insert cid seen) (objectLinks obj <> cids')
 
     pushObject root (cid, obj) = do
         let raw = Git.looseMarshall obj

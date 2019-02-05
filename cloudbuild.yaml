@@ -57,7 +57,13 @@ steps:
     name: "haskell:8.6.3"
     args:
     - "/builder/home/.cabal/bin/hlint"
-    - "."
+    - "binary-varint"
+    - "git-remote-ipfs"
+    - "ipfs-api"
+    - "ipld-cid"
+    - multibase
+    - "multihash-cryptonite"
+    - "multihash-serialise"
 
   - id: "Build and Test"
     waitFor:
