@@ -22,11 +22,13 @@ import           Control.Monad.Except
 import           Control.Monad.Reader
 import           Data.Bifunctor (first)
 import qualified Data.ByteString.Lazy as L
-import           Data.Foldable (toList, traverse_)
+import           Data.Foldable (for_, toList, traverse_)
+import           Data.Functor ((<&>))
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashSet as Set
 import           Data.IORef (atomicModifyIORef')
-import           Data.Maybe (catMaybes, isNothing)
+import           Data.IORef
+import           Data.Maybe (catMaybes)
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Read as Text
@@ -46,10 +48,16 @@ import           Data.Git.Ref (SHA1)
 import qualified Data.Git.Ref as Git (Ref)
 import qualified Data.Git.Repository as Git (branchList, resolveRevision)
 import qualified Data.Git.Revision as Git (Revision(..))
-import qualified Data.Git.Storage as Git (Git, getObject, getObject_, setObject)
+import qualified Data.Git.Storage as Git
+                 ( Git
+                 , findReference
+                 , getObject_
+                 , setObject
+                 )
 import qualified Data.Git.Storage.Loose as Git (looseMarshall, looseUnmarshall)
 import qualified Data.Git.Storage.Object as Git
                  ( Object(ObjBlob)
+                 , ObjectLocation(..)
                  , ObjectType(TypeBlob)
                  , objectWrite
                  , objectWriteHeader
@@ -194,8 +202,8 @@ processPush _ localRef remoteRef = do
 
     maxConc <- asks $ ipfsMaxConns . envIpfsOptions
     runConduit $
-           collectObjects (maybe mempty Set.singleton remoteRefCid)
-                          (Vector.singleton localRefCid)
+           yield localRefCid
+        .| collectObjects remoteRefCid
         .| Conduit.conduitVector maxConc
         .| Conduit.mapM_ (\(batch :: Vector (CID, Git.Object SHA1)) ->
                forConcurrently_ batch $ pushObject root)
@@ -210,21 +218,21 @@ processPush _ localRef remoteRef = do
             -- HEAD is our new root, update the remote.url and pin
             hEAD <$ concurrently_ (updateRemoteUrl hEAD) (pin hEAD)
   where
-    collectObjects _    cids | Vector.null cids = pure ()
-    collectObjects seen cids = do
-        let cid   = Vector.unsafeHead cids
-        let cids' = Vector.unsafeTail cids
+    collectObjects
+        :: Maybe CID -- the CID already present remotely, if any
+        -> ConduitT CID (CID, Git.Object SHA1) (RemoteHelper ProcessError) ()
+    collectObjects remoteRefCid = do
+        sref <- liftIO . newIORef $ maybe mempty Set.singleton remoteRefCid
+        awaitForever $ \cid -> do
+            seen <- liftIO $ readIORef sref
+            unless (Set.member cid seen) $ do
+                liftIO $ modifyIORef' sref (Set.insert cid)
+                obj <- lift $ do
+                    sha <- liftEitherRH . first CidError $ cidToRef @SHA1 cid
+                    git $ \repo -> Git.getObject_ repo sha True
 
-        if | Set.member cid seen -> collectObjects seen cids'
-           | otherwise           -> do
-
-            obj <- lift $ do
-                sha <- liftEitherRH . first CidError $ cidToRef @SHA1 cid
-                git $ \repo -> Git.getObject_ repo sha True
-
-            yield (cid, obj)
-
-            collectObjects (Set.insert cid seen) (objectLinks obj <> cids')
+                yield (cid, obj)
+                traverse_ leftover $ objectLinks obj
 
     pushObject root (cid, obj) = do
         let raw = Git.looseMarshall obj
@@ -268,34 +276,44 @@ processFetch :: HasCallStack => Text -> RemoteHelper ProcessError ()
 processFetch sha = do
     cid  <- liftEitherRH . first CidError $ cidFromHexShaText sha
     lobs <- loadLobs
+    maxC <- asks $ ipfsMaxConns . envIpfsOptions
 
     runConduit $
-           fetchObjects lobs (Vector.singleton cid)
+           yield (Vector.singleton cid)
+        .| fetchObjects lobs maxC
         .| Conduit.mapM_ storeObject
 
     void $ asks envIpfsRoot >>= ipfs . pin
   where
     fetchObjects
-        :: HashMap CID CID
-        -> Vector CID
-        -> ConduitT () (Git.Ref SHA1, Git.Object SHA1) (RemoteHelper ProcessError) ()
-    fetchObjects !lobs cids = do
-        todo <- lift $ do
-            xs <-
-                for cids $ \cid -> do
-                    ref <- liftEitherRH . first CidError $ cidToRef @SHA1 cid
-                    pure (ref, cid)
-            Vector.filterM (fmap isNothing . lookupObject . fst) xs
+        :: HashMap CID CID -- LOB index
+        -> Int             -- Max concurrency
+        -> ConduitT (Vector CID)
+                    (Git.Ref SHA1, Git.Object SHA1)
+                    (RemoteHelper ProcessError)
+                    ()
+    fetchObjects !lobs maxConc = do
+        sref <- liftIO $ newIORef Set.empty
+        awaitForever $ \cids -> do
+            seen <- liftIO $ readIORef sref
+            todo <-
+                fmap (Vector.mapMaybe id) . for cids $ \cid ->
+                    if Set.member cid seen then
+                        pure Nothing
+                    else do
+                        liftIO $ modifyIORef' sref (Set.insert cid)
+                        lift $ do
+                            ref <- liftEitherRH . first CidError $ cidToRef cid
+                            lookupObject ref <&> \case
+                                Git.NotFound -> Just (ref, cid)
+                                _            -> Nothing
 
-        unless (Vector.null todo) $ do
-            objs <- lift $ do
-                logDebug $ fmt ("Fetching objects: " % shown) todo
-                maxConc <- asks $ ipfsMaxConns . envIpfsOptions
-                fmap join . for (chunksOfV maxConc todo) $ \batch ->
-                    forConcurrently batch (fetchObject lobs . snd)
-            traverse_ yield $
-                Vector.zip (Vector.map fst todo) objs
-            fetchObjects lobs $ foldMap objectLinks objs
+            for_ (chunksOfV maxConc todo) $ \batch -> do
+                objs <-
+                    lift . forConcurrently batch $ \(ref, cid) ->
+                        (ref,) <$> fetchObject lobs cid
+                Conduit.yieldMany objs
+                traverse_ leftover $ Vector.map (objectLinks . snd) objs
 
     fetchObject lobs cid = ipfs $ do
         lob <- provideLargeObject lobs cid
@@ -306,7 +324,7 @@ processFetch sha = do
         when (ref' /= ref) $
             throwRH $ HashError (RefMismatch ref ref')
 
-    lookupObject ref = git $ \repo -> Git.getObject repo ref True
+    lookupObject ref = git $ flip Git.findReference ref
 
     loadLobs = do
         env <- ask
