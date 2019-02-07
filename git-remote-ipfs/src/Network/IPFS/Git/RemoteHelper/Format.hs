@@ -8,8 +8,10 @@ module Network.IPFS.Git.RemoteHelper.Format
     , fref
     , frefName
 
+    -- Re-exports
     , (%)
     , shown
+    , Format
     )
 where
 
