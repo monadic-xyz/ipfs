@@ -26,17 +26,18 @@ import           Data.Foldable (for_, toList, traverse_)
 import           Data.Functor ((<&>))
 import           Data.HashMap.Strict (HashMap)
 import qualified Data.HashSet as Set
-import           Data.IORef (atomicModifyIORef')
 import           Data.IORef
 import           Data.Maybe (catMaybes)
 import           Data.Text (Text)
 import qualified Data.Text as Text
+import qualified Data.Text.IO as Text (hPutStr, hPutStrLn)
 import qualified Data.Text.Read as Text
 import           Data.Traversable (for)
 import           Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import           GHC.Stack (HasCallStack)
 import           System.FilePath (joinPath, splitDirectories)
+import           System.IO (hFlush, stderr)
 
 import           Data.Conduit
 import qualified Data.Conduit.Combinators as Conduit
@@ -204,6 +205,7 @@ processPush _ localRef remoteRef = do
     runConduit $
            yield localRefCid
         .| collectObjects remoteRefCid
+        .| progress ("Pushed " % fint % " objects")
         .| Conduit.conduitVector maxConc
         .| Conduit.mapM_ (\(batch :: Vector (CID, Git.Object SHA1)) ->
                forConcurrently_ batch $ pushObject root)
@@ -281,6 +283,7 @@ processFetch sha = do
     runConduit $
            yield (Vector.singleton cid)
         .| fetchObjects lobs maxC
+        .| progress ("Fetched " % fint % " objects")
         .| Conduit.mapM_ storeObject
 
     void $ asks envIpfsRoot >>= ipfs . pin
@@ -358,3 +361,15 @@ chunksOfV n = Vector.unfoldr go
   where
     go v | Vector.null v = Nothing
          | otherwise     = Just $ Vector.splitAt n v
+
+progress :: MonadIO m => Format Text (Int -> Text) -> ConduitT a a m ()
+progress msg = do
+    let msg' = "\r" % msg % "\r"
+    cref <- liftIO $ newIORef (0 :: Int)
+    awaitForever $ \x -> do
+        liftIO $ do
+            count <- readIORef cref
+            Text.hPutStr stderr (fmt msg' count) *> hFlush stderr
+            modifyIORef' cref (+1)
+        yield x
+    liftIO $ Text.hPutStrLn stderr mempty *> hFlush stderr
