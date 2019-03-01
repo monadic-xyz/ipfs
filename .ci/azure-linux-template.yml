@@ -1,0 +1,38 @@
+jobs:
+- job: ${{ parameters.name }}
+  pool:
+    vmImage: ${{ parameters.vmImage }}
+  strategy:
+    matrix:
+      ghc-8.4.4:
+        GHCVER: "8.4.4"
+        CABALVER: "2.4.1.0"
+      ghc-8.6.3:
+        GHCVER: "8.6.3"
+        CABALVER: "2.4.1.0"
+    maxParallel: 6
+  steps:
+  - script: |
+      set -xeuo pipefail
+
+      sudo apt-get install libnuma-dev
+
+      sudo mkdir -p $HOME/.ghcup/bin
+      sudo chown -R $(whoami) $HOME/.ghcup
+      curl -L https://github.com/haskell/ghcup/releases/download/0.0.7/ghcup > $HOME/.ghcup/bin/ghcup
+      chmod +x $HOME/.ghcup/bin/ghcup
+
+      export PATH="$HOME/.cabal/bin:$HOME/.ghcup/bin:$PATH"
+
+      ghcup install "$GHCVER"
+      ghcup set "$GHCVER"
+      ghcup install-cabal "$CABALVER"
+
+      cabal v2-update
+      cabal v2-configure --enable-tests
+      cabal v2-build -j all
+      cabal v2-test -j all
+
+    env:
+      OS_NAME: ${{ parameters.os }}
+    displayName: "${{parameters.os}}: Setup + Build + Test"

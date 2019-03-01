@@ -1,0 +1,18 @@
+jobs:
+- template: ./.ci/azure-linux-template.yml
+  parameters:
+    name: Linux
+    vmImage: ubuntu-16.04
+    os: linux
+
+- template: ./.ci/azure-macos-template.yml
+  parameters:
+    name: macOS
+    vmImage: macOS-10.13
+    os: osx
+
+- template: ./.ci/azure-windows-template.yml
+  parameters:
+    name: Windows
+    vmImage: vs2017-win2016
+    os: windows

@@ -1,4 +1,4 @@
-resolver: lts-13.5
+resolver: lts-13.9
 packages:
 - binary-varint
 - git-remote-ipfs
