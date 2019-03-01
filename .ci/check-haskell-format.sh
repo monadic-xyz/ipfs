@@ -7,11 +7,13 @@ shopt -s globstar
 PATH=$HOME/.cabal/bin:$PATH
 
 base=$(mktemp -d "/tmp/gossip-base.XXXXX")
+# nb. 'Client.hs' excluded because stylish-haskell chokes on CPP
 srcs=$(find . -name "*.hs" \
+              -not -path "*/Network/IPFS/Git/RemoteHelper/Client.hs" \
               -not -name "Setup.hs" \
               -not -name "Paths_*.hs" \
               -not -path "*dist*" \
-              -not -path "*/gen/*"\
+              -not -path "*/gen/*" \
               -not -path "*.stack*")
 
 for f in $srcs; do

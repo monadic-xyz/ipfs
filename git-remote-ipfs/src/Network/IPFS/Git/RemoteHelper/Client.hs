@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                       #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleContexts          #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
@@ -51,7 +52,6 @@ import           System.FilePath (joinPath)
 import           System.Process.Typed (runProcess_, shell)
 
 import           Servant.API
-import           Servant.Client (ServantError(..))
 import qualified Servant.Client as Servant
 import qualified Servant.Client.Streaming as ServantS
 import           Servant.Types.SourceT
@@ -69,6 +69,10 @@ import           Network.IPFS.Git.RemoteHelper.Options
                  , remoteUrlScheme
                  )
 import           Network.IPFS.Git.RemoteHelper.Trans
+
+#if MIN_VERSION_servant_client(0,16,0)
+type ServantError = Servant.ClientError
+#endif
 
 data ClientError
     = ApiError ServantError
@@ -327,7 +331,11 @@ pinsL = Lens.key "Pins" . Lens.values . Lens._String
 -- brilliant API design
 isNoLink :: ServantError -> Bool
 isNoLink = \case
-    FailureResponse res ->
+#if MIN_VERSION_servant_client(0,16,0)
+    Servant.FailureResponse _ res ->
+#else
+    Servant.FailureResponse   res ->
+#endif
         case Lens.firstOf messageL (Servant.responseBody res) of
             Just  m | "no link named" `Text.isPrefixOf` m -> True
             _                                             -> False

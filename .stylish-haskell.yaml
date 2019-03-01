@@ -179,6 +179,7 @@ newline: native
 language_extensions:
   - BangPatterns
   - ConstraintKinds
+  - CPP
   - DefaultSignatures
   - DeriveFoldable
   - DeriveFunctor
