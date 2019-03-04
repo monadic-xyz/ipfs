@@ -72,6 +72,8 @@ import           Network.IPFS.Git.RemoteHelper.Trans
 
 #if MIN_VERSION_servant_client(0,16,0)
 type ServantError = Servant.ClientError
+#else
+type ServantError = Servant.ServantError
 #endif
 
 data ClientError
