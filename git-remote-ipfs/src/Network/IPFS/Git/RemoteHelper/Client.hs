@@ -108,7 +108,7 @@ listPaths
     -> RemoteHelperT ClientError m [RefPath]
 listPaths path !level = do
     logDebug $ "listPaths: " <> path
-    refs <- ipfsList path Nothing Nothing
+    refs <- ipfsList path Nothing (Just True)
     logDebug $ "listPaths: " <> Text.pack (show refs)
     fmap concat <$> for (Lens.toListOf linksL refs) $ \link ->
             case Lens.firstOf typeL link of
@@ -130,7 +130,10 @@ listPaths path !level = do
                         , refPathHash = hash
                         }
                 -- unknown (assume head):
-                Just (-1) -> pure . maybeToList $ do
+                --
+                -- Nb.: unknown is 0 in ipfs version >= 0.4.19, and -1 in
+                -- earlier versions.
+                Just x | x == 0 || x == -1 -> pure . maybeToList $ do
                     name <- Lens.firstOf nameL link
                     hash <- Lens.firstOf hashL link
                     pure RefPath
@@ -138,7 +141,8 @@ listPaths path !level = do
                         , refPathType = RefPathHead
                         , refPathHash = hash
                         }
-
+                -- Post-0.4.19, this can only be @TSymlink@, previously .. idk.
+                -- Either way, we don't know what to do.
                 Just x -> throwRH $
                     InvalidResponse (fmt ("Unexpected link type: " % shown) x) refs
 
