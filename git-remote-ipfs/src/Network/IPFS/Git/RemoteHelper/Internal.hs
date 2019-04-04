@@ -4,6 +4,7 @@
 module Network.IPFS.Git.RemoteHelper.Internal where
 
 import qualified Crypto.Hash as C
+import qualified Data.ByteString.BaseN as BaseN
 import           Data.Maybe (fromMaybe)
 import           Data.Text (Text)
 import qualified Data.Text as Text
@@ -15,7 +16,6 @@ import qualified Data.Git.Ref as Git
 import           Data.Git.Storage.Object (Object(..))
 import           Data.Git.Types
 
-import qualified Data.ByteString.Multibase as Multibase
 import           Data.IPLD.CID
                  ( CID
                  , Codec(..)
@@ -58,7 +58,7 @@ blobLinks = const mempty
 
 cidFromHexShaText :: Text -> Either String CID
 cidFromHexShaText t = do
-    bytes  <- Multibase.decodeBase16 $ Text.encodeUtf8 t
+    bytes  <- BaseN.decodeBase16Either $ Text.encodeUtf8 t
     digest <- note ("Invalid digest: " <> Text.unpack t) $ C.digestFromByteString @Git.SHA1 bytes
     pure $ newCidV1 GitRaw digest
 

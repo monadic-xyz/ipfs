@@ -15,3 +15,4 @@ extra-deps:
 - git-0.3.0
 - sandi-0.4.3@sha256:2ada9c759424f243095ab28b55687cdec4e9d16bac3589f9d200280207c50216
 - serialise-0.2.1.0@sha256:8d6051f64c6ebfaf705195dd0b8dfb667617f2e674b290ed2e44985009e4f951
+- base32-z-bytestring-1.0.0.0

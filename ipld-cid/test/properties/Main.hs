@@ -7,6 +7,7 @@ module Main where
 import           Control.Monad (unless)
 import qualified Crypto.Hash as C
 import           Data.ByteString (ByteString)
+import qualified Data.ByteString.BaseN as BaseN
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy as LBS
 import           Data.Foldable (for_)
@@ -16,7 +17,7 @@ import           Data.Text.Encoding (decodeUtf8)
 import           System.Exit (exitFailure)
 import           System.IO (BufferMode(..), hSetBuffering, stderr, stdout)
 
-import           Data.ByteString.Multibase (Base(..), fromMultibase)
+import           Data.ByteString.Multibase (fromMultibase)
 import qualified Data.ByteString.Multibase as Multibase
 import           Data.IPLD.CID
                  ( CID
@@ -67,7 +68,7 @@ prop_ambiguousVersion :: Property
 prop_ambiguousVersion = property $ do
     hash <- forAllWith (show . Multihash.encodedBytes) (genMultihash C.SHA256)
     let
-        encoded = Multibase.encode Base32 (Multihash.encodedBytes hash)
+        encoded = Multibase.encode (BaseN.encodeAtBase BaseN.Base32 . Multihash.encodedBytes $ hash)
         notACid = decodeUtf8 $ fromMultibase encoded
         fromTxt = cidFromText notACid
      in do
