@@ -1,3 +1,4 @@
+{-# LANGUAGE DataKinds         #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
@@ -42,10 +43,10 @@ import           Data.Binary.Get as Binary
 import           Data.Binary.VarInt (buildVarInt, getVarInt)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.BaseN as BaseN
 import           Data.ByteString.Builder (Builder)
 import qualified Data.ByteString.Builder as Builder
 import qualified Data.ByteString.Lazy as LBS
-import           Data.ByteString.Multibase (Base(Base58btc))
 import qualified Data.ByteString.Multibase as Multibase
 import           Data.Hashable (Hashable)
 import           Data.Multihash (Multihash, Multihashable)
@@ -179,7 +180,7 @@ cidFromText t = decodeBase >=> decodeCid $ encodeUtf8 t
   where
     isV0 = Text.length t == 46 && "Qm" `Text.isPrefixOf` t
 
-    decodeBase | isV0      = Multibase.decodeBase58btc
+    decodeBase | isV0      = BaseN.decodeBase58btc
                | otherwise = Multibase.decode >=> guardReserved
 
     -- "If the first decoded byte is 0x12, return an error. CIDv0 CIDs may not
@@ -198,11 +199,13 @@ cidToText :: CID -> Text
 cidToText cid =
       decodeUtf8
     $ case cidVersion cid of
-          V0 -> Multibase.encodeBase58btc
+          V0 -> BaseN.encodedBytes
+              . BaseN.encodeBase58btc
               . Multihash.encodedBytes
               $ cidHash cid
           V1 -> Multibase.fromMultibase
-              . Multibase.encode Base58btc
+              . Multibase.encode
+              . BaseN.encodeBase58btc
               . LBS.toStrict . Builder.toLazyByteString
               $ buildCid cid
 

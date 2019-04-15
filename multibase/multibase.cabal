@@ -43,17 +43,24 @@ library
     import: common
     hs-source-dirs: src
     exposed-modules:
+        Data.ByteString.BaseN
         Data.ByteString.Multibase
 
     build-depends:
-        base >= 4.9 && < 5
+      , aeson
+      , base >= 4.9 && < 5
       , base16-bytestring
+      , base32-z-bytestring
       , base58-bytestring
       , base64-bytestring
       , bytestring
       , deepseq
+      , formatting
       , hashable
       , sandi
+      , serialise
+      , tagged
+      , text
 
 test-suite doctests
     import: common
