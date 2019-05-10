@@ -266,10 +266,15 @@ getBlock cid = stream $ ipfsBlockGet (cidToText cid)
 
 updateRemoteUrl :: MonadIO m => CID -> RemoteHelperT ClientError m ()
 updateRemoteUrl root = do
-    url <- asks $ optRemoteUrl . envOptions
+    url    <- asks $ optRemoteUrl . envOptions
+    remote <- asks $ Text.pack . optRemoteName . envOptions
+
     case remoteUrlIpfsPath url of
         IpfsPathIpns name -> viaIpns name
-        IpfsPathIpfs _    -> viaConfig (remoteUrlScheme url) root
+        IpfsPathIpfs _    -> viaConfig (remoteUrlScheme url) remote root
+
+    -- backup plan in case the IPNS link expires
+    updateConfig ("remote." <> remote <> ".lastseencid") (cidToText root)
   where
     viaIpns name = do
         let ipnsTarget = "/ipfs/" <> cidToText root
@@ -294,16 +299,17 @@ updateRemoteUrl root = do
                          ) name ipnsTarget)
                     res
 
-    viaConfig scheme cid = do
-        remoteName <- asks $ Text.pack . optRemoteName . envOptions
+    viaConfig scheme remoteName cid =
         let
             configKey = "remote." <> remoteName <> ".url"
             remoteUrl = scheme <> "://ipfs/" <> cidToText cid
-         in do
-            logInfo $
-                fmt ("Updating " % ftxt % " to " % ftxt) configKey remoteUrl
-            runProcess_ . shell . Text.unpack $
-                "git config " <> configKey <> " " <> remoteUrl
+         in
+            updateConfig configKey remoteUrl
+
+    updateConfig key value = do
+        logInfo $ fmt ("Updating " % ftxt % " to " % ftxt) key value
+        runProcess_ . shell . Text.unpack $
+            "git config " <> key <> " " <> value
 
 -- lenses
 
