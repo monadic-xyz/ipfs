@@ -1376,7 +1376,7 @@ type ApiV0PinAdd =
 type ApiV0PinLs =
       "api" :> "v0" :> "pin" :> "ls"
     -- Path to object(s) to be listed.
-    :> QueryParam' '[Required, Strict] "arg" Text
+    :> QueryParam "arg" Text
     -- The type of pinned keys to list. Can be "direct", "indirect", "recursive", or
     -- "all". Default: all.
     :> QueryParam "type" Text
