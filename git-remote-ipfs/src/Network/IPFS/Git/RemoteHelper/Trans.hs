@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP                        #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings          #-}
 {-# LANGUAGE TypeFamilies               #-}
@@ -76,6 +77,7 @@ import           Data.Git (Git)
 import           Data.Git.Monad (GitMonad(..))
 import           Data.Git.Ref (SHA1)
 import           Data.Git.Storage (findRepo, openRepo)
+import qualified Data.Git.Repository as Git (configGet)
 
 import           Network.HTTP.Client
                  ( defaultManagerSettings
@@ -86,7 +88,7 @@ import           Network.HTTP.Client
 import           Servant.Client.Streaming (mkClientEnv)
 import qualified Servant.Client.Streaming as Servant
 
-import           Data.IPLD.CID (CID, cidFromText)
+import           Data.IPLD.CID (CID, cidFromText, cidToText)
 import           Network.IPFS.API (ApiV0NameResolve)
 
 import           Network.IPFS.Git.RemoteHelper.Internal (note)
@@ -302,7 +304,31 @@ newEnv envLogger envOptions envIpfsOptions = do
                                         Nothing
                                         Nothing
                 case res of
-                    Left  e -> throwM e
+                    Left  e
+                      | isCouldNotResolve e -> do
+
+                        lastSeen <-
+                            Git.configGet envGit
+                                         ("remote." <> optRemoteName envOptions)
+                                         "lastseencid"
+                        case lastSeen of
+                            Nothing -> throwString $
+                                  "Could not resolve repo IPNS name "
+                               <> Text.unpack name
+                               <> " and no fallback found."
+                            Just ls -> do
+                                root <-
+                                    either throwString pure $
+                                        cidFromText (Text.pack ls)
+                                _logInfo envLogger $
+                                       "Warning: Could not resolve repo IPNS name "
+                                    <> name
+                                    <> ", falling back to last seen CID: "
+                                    <> cidToText root
+                                pure root
+
+                      | otherwise -> throwM e
+
                     Right v -> either throwString pure $ do
                         path <-
                             note "ipfsNameResolve: expected 'Path' key" $
@@ -314,6 +340,18 @@ newEnv envLogger envOptions envIpfsOptions = do
     pure Env {..}
   where
     ipfsNameResolve = Servant.client (Proxy @ApiV0NameResolve)
+
+    isCouldNotResolve = \case
+#if MIN_VERSION_servant_client(0,16,0)
+        Servant.FailureResponse _ res ->
+#else
+        Servant.FailureResponse   res ->
+#endif
+            case Lens.firstOf (Lens.key "Message") (Servant.responseBody res) of
+                Just "could not resolve name" -> True
+                _                             -> False
+        _ -> False
+
 
 runRemoteHelperT
     :: Env
