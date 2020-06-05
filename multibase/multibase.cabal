@@ -2,7 +2,7 @@ cabal-version: 2.2
 build-type:    Custom
 
 name:          multibase
-version:       0.1.0.0
+version:       0.1.1
 synopsis:      Self-identifying base encodings, implementation of <https://github.com/multiformats/multihash>
 homepage:      https://github.com/oscoin/ipfs
 bug-reports:   https://github.com/oscoin/ipfs/issues
