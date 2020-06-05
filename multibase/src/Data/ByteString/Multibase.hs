@@ -16,6 +16,8 @@
 module Data.ByteString.Multibase
     ( -- * Supported bases
       BaseN.Base(..)
+    , ToCode
+
     -- * Multibase encoding and decoding
     , Multibase
     , fromMultibase
@@ -54,6 +56,7 @@ import           Data.Typeable
 --  | Base8             -- ^ octal
 --  | Base10            -- ^ decimal
 
+-- | Symbols for which a multibase code is defined and supported by this library
 class ValidBase b => ToCode b where
     toCode   :: proxy b -> Char
 
