@@ -49,7 +49,7 @@ library
     build-depends:
       , aeson
       , base >= 4.9 && < 5
-      , base16-bytestring
+      , base16-bytestring >= 1.0.0.0 && < 2.0.0.0
       , base32-z-bytestring
       , base58-bytestring
       , base64-bytestring

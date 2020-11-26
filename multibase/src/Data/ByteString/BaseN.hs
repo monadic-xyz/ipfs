@@ -561,15 +561,7 @@ decodeBase16 :: ByteString -> Maybe ByteString
 decodeBase16 = either (const Nothing) pure . decodeBase16Either
 
 decodeBase16Either :: ByteString -> Either String ByteString
-decodeBase16Either bs =
-    case Base16.decode bs of
-        (x, "")      -> Right x
-        (x, invalid) -> Left . mconcat $
-            [ "Decoded: "
-            , "`", unpack x, "`"
-            , " until invalid sequence: "
-            , "`", unpack invalid, "`"
-            ]
+decodeBase16Either = Base16.decode
 {-# INLINE decodeBase16Either #-}
 
 decodeBase64 :: ByteString -> Maybe ByteString
